@@ -6,6 +6,9 @@ from pathlib import Path
 
 from app.config import settings
 from app.data.database import Database
+from app.data.cache import RedisCache
+from app.rag.engine import RAGEngine
+from app.rag.ingestion import IngestionPipeline
 from app.mcp.server import MCPServer
 from app.mcp.tools.transcript import TranscriptTool
 from app.mcp.tools.vision import VisionTool
@@ -13,55 +16,79 @@ from app.mcp.tools.retrieval import RetrievalTool
 from app.mcp.tools.reason import ReasonTool
 from app.mcp.resources.knowledge import KnowledgeResource
 from app.mcp.resources.cache import CacheResource
-from app.api.routes import router, analyzer as analyzer_ref, db as db_ref
+from app.api.routes import router as api_router
+from app.api.routes import init_routes as init_api_routes
+from app.auth.routes import router as auth_router
+from app.auth.routes import init_routes as init_auth_routes
 from app.pipeline.analyzer import Analyzer
+from app.middleware.logging import setup_logging
+from app.middleware.error_handler import ErrorHandlerMiddleware, RequestValidationMiddleware
 from seed.knowledge import seed_knowledge_base
 
 db: Database = None
 mcp: MCPServer = None
+rag_engine: RAGEngine = None
+redis_cache: RedisCache = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, mcp
+    global db, mcp, rag_engine, redis_cache
 
+    logger = setup_logging(settings.log_level, settings.log_file)
     Path("data").mkdir(exist_ok=True)
+
+    logger.info("Starting ClearLens server", extra={"port": settings.port, "debug": settings.debug})
 
     db = Database(settings.database_path)
 
+    redis_cache = RedisCache()
+
+    rag_engine = RAGEngine(persist_dir=settings.rag_persist_dir)
+    loaded = rag_engine.load()
+    if loaded:
+        logger.info(f"RAG engine loaded from disk ({rag_engine.document_count} docs)")
+    else:
+        logger.info("RAG engine initialized (empty, seed with documents)")
+
     mcp = MCPServer()
 
-    transcript_tool = TranscriptTool()
-    vision_tool = VisionTool()
-    retrieval_tool = RetrievalTool()
-    reason_tool = ReasonTool()
-
-    mcp.register_tool(transcript_tool)
-    mcp.register_tool(vision_tool)
-    mcp.register_tool(retrieval_tool)
-    mcp.register_tool(reason_tool)
+    mcp.register_tool(TranscriptTool())
+    mcp.register_tool(VisionTool())
+    mcp.register_tool(RetrievalTool(engine=rag_engine))
+    mcp.register_tool(ReasonTool())
 
     knowledge = KnowledgeResource()
     cache_res = CacheResource(db)
     mcp.register_resource(knowledge)
     mcp.register_resource(cache_res)
 
-    if knowledge.count() == 0:
+    if knowledge.count() == 0 and rag_engine.document_count == 0:
         seed_knowledge_base(knowledge)
+        docs = [
+            {"id": d.id, "content": d.content, "source": d.source, "source_tier": d.source_tier, "title": d.title}
+            for d in knowledge.get_all()
+        ]
+        if docs:
+            await rag_engine.ingest(docs)
+            logger.info(f"Seeded RAG engine with {len(docs)} knowledge documents")
 
-    retrieval_tool._collection = None
-    retrieval_tool._embedding_fn = None
-
+    ingestion_pipeline = IngestionPipeline(rag_engine)
     analyzer = Analyzer(mcp, db)
 
-    import app.api.routes as routes
-    routes.analyzer = analyzer
-    routes.db = db
+    init_api_routes(analyzer, db, redis_cache)
+    init_auth_routes(db)
+
+    app.include_router(auth_router)
+    app.include_router(api_router, prefix="/api/v1")
+
+    logger.info("Server startup complete", extra={"tools": len(mcp.list_tools()), "resources": len(mcp.list_resources())})
 
     yield
 
-    db = None
-    mcp = None
+    if redis_cache:
+        await redis_cache.close()
+    logger.info("Server shutting down")
 
 
 app = FastAPI(
@@ -70,14 +97,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(ErrorHandlerMiddleware)
+app.add_middleware(RequestValidationMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*", "https://*.youtube.com"],
+    allow_origins=["chrome-extension://*", "https://*.youtube.com", "http://localhost:*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
-
-app.include_router(router, prefix="/api/v1")
 
 ext_path = Path(__file__).parent.parent / "extension"
 if ext_path.exists():
@@ -86,11 +114,21 @@ if ext_path.exists():
 
 @app.get("/")
 async def root():
+    landing = Path(__file__).parent.parent / "extension" / "landing" / "index.html"
+    if landing.exists():
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=landing.read_text(encoding="utf-8"), status_code=200)
+    return {"app": settings.app_name, "status": "running"}
+
+
+@app.get("/api/status")
+async def api_status():
     return {
         "app": settings.app_name,
-        "docs": "/docs",
+        "version": "1.0.0",
         "tools": mcp.list_tools() if mcp else [],
-        "resources": mcp.list_resources() if mcp else []
+        "resources": mcp.list_resources() if mcp else [],
+        "rag_docs": rag_engine.document_count if rag_engine else 0
     }
 
 

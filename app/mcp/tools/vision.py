@@ -24,29 +24,42 @@ class VisionTool(Tool):
         if not frames:
             return {"ocr_text": None, "used": True, "reason": "no_frames"}
         text = await self._ocr_frames(frames)
-        return {"ocr_text": text, "used": True, "reason": "completed"}
+        return {"ocr_text": text, "used": True, "reason": "completed", "frames": len(frames)}
 
     def _needs_vision(self, claim: str) -> bool:
         triggers = [
             "this image", "this screenshot", "this photo", "this meme",
             "this post", "this graphic", "this chart", "this picture",
-            "visual", "screenshot", "overlay", "caption shows"
+            "visual", "screenshot", "overlay", "caption shows",
+            "text says", "screen shows", "graph shows"
         ]
         return any(t in claim.lower() for t in triggers)
 
     async def _extract_keyframes(self, video_id: str) -> Optional[list[str]]:
-        try:
-            import httpx
-            url = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, timeout=10)
-                if resp.status_code == 200:
-                    import base64
-                    b64 = base64.b64encode(resp.content).decode()
-                    return [f"data:image/jpeg;base64,{b64}"]
-        except Exception:
-            pass
-        return None
+        frames = []
+        import httpx
+        import asyncio
+        import base64
+
+        async with httpx.AsyncClient() as client:
+            thumbnail_urls = [
+                f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
+                f"https://img.youtube.com/vi/{video_id}/sddefault.jpg",
+                f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
+                f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+            ]
+            tasks = [client.get(url, timeout=10) for url in thumbnail_urls]
+            responses = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for resp in responses:
+                if isinstance(resp, Exception) or resp.status_code != 200:
+                    continue
+                b64 = base64.b64encode(resp.content).decode()
+                frames.append(f"data:image/jpeg;base64,{b64}")
+                if len(frames) >= 3:
+                    break
+
+        return frames if frames else None
 
     async def _ocr_frames(self, frames: list[str]) -> str:
         if not settings.gemini_api_key:
@@ -56,7 +69,7 @@ class VisionTool(Tool):
             text = await self._gemini_ocr(frame)
             if text:
                 extracted.append(text)
-        return "\n".join(extracted)
+        return "\n---\n".join(extracted)
 
     async def _gemini_ocr(self, image_b64: str) -> Optional[str]:
         try:
@@ -65,7 +78,7 @@ class VisionTool(Tool):
             payload = {
                 "contents": [{
                     "parts": [
-                        {"text": "Extract all visible text from this image. Include headlines, captions, overlays, and meme text. Return only the extracted text, no commentary."},
+                        {"text": "Extract all visible text from this image. Include headlines, captions, overlays, meme text, and any text in screenshots. Return only the extracted text, no commentary."},
                         {"inline_data": {"mime_type": "image/jpeg", "data": image_b64.split(",")[-1]}}
                     ]
                 }]

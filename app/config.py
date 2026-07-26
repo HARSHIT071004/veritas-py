@@ -13,12 +13,19 @@ class Settings(BaseSettings):
 
     database_path: str = "data/clearlens.db"
     cache_ttl_seconds: int = 86400
-    chroma_persist_dir: str = "data/chroma"
+    rag_persist_dir: str = "data/rag"
+
+    jwt_secret: str = "clearlens-dev-secret-change-in-production"
+    jwt_expiry_seconds: int = 86400
+
+    redis_url: Optional[str] = None
+    redis_enabled: bool = False
 
     rate_limit_per_hour: int = 50
     max_analysis_per_day: int = 20
 
-    youtube_transcript_proxy: Optional[str] = None
+    log_level: str = "INFO"
+    log_file: Optional[str] = None
 
     class Config:
         env_file = ".env"

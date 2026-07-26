@@ -10,12 +10,13 @@
   <div id="app">
     <header>
       <h1>ClearLens</h1>
-      <span class="subtitle">Misinformation Checker</span>
+      <span class="subtitle" id="auth-status"></span>
     </header>
 
     <nav>
       <button class="tab active" data-tab="dashboard">Dashboard</button>
       <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="account">Account</button>
     </nav>
 
     <main>
@@ -37,6 +38,29 @@
         <div id="history-list">
           <p class="empty">No videos checked yet.</p>
         </div>
+      </section>
+
+      <section id="account" class="tab-content">
+        <div id="login-form">
+          <h3>Login</h3>
+          <input type="email" id="login-email" placeholder="Email">
+          <input type="password" id="login-password" placeholder="Password">
+          <button id="login-btn" class="btn-primary">Login</button>
+          <p class="switch-form">No account? <a href="#" id="show-register">Register</a></p>
+        </div>
+        <div id="register-form" style="display:none;">
+          <h3>Register</h3>
+          <input type="text" id="reg-name" placeholder="Name (optional)">
+          <input type="email" id="reg-email" placeholder="Email">
+          <input type="password" id="reg-password" placeholder="Password (min 6 chars)">
+          <button id="register-btn" class="btn-primary">Register</button>
+          <p class="switch-form">Already have an account? <a href="#" id="show-login">Login</a></p>
+        </div>
+        <div id="profile" style="display:none;">
+          <p id="profile-email"></p>
+          <button id="logout-btn" class="btn-secondary">Logout</button>
+        </div>
+        <div id="auth-error" class="error-msg" style="display:none;"></div>
       </section>
     </main>
   </div>

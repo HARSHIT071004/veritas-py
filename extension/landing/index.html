@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearLens — AI Misinformation Detector for YouTube Shorts</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a1a; color: #e2e8f0; line-height: 1.6; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 0; border-bottom: 1px solid #1e293b; }
+    .logo { font-size: 24px; font-weight: 800; letter-spacing: 1px; }
+    .logo span { color: #38bdf8; }
+    .nav-links { display: flex; gap: 28px; align-items: center; }
+    .nav-links a { color: #94a3b8; text-decoration: none; font-size: 14px; transition: color 0.2s; }
+    .nav-links a:hover { color: #38bdf8; }
+    .btn { padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn-primary { background: #38bdf8; color: #0a0a1a; border: none; }
+    .btn-primary:hover { background: #7dd3fc; }
+    .btn-outline { border: 1px solid #334155; color: #e2e8f0; background: transparent; }
+    .btn-outline:hover { border-color: #38bdf8; color: #38bdf8; }
+
+    .hero { padding: 100px 0 80px; text-align: center; }
+    .hero h1 { font-size: 52px; font-weight: 800; line-height: 1.15; margin-bottom: 20px; }
+    .hero h1 span { color: #38bdf8; }
+    .hero p { font-size: 18px; color: #94a3b8; max-width: 640px; margin: 0 auto 36px; }
+    .hero-btns { display: flex; gap: 16px; justify-content: center; }
+    .hero-badge { display: inline-block; background: #1e293b; color: #38bdf8; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 24px; }
+
+    .flow { padding: 80px 0; }
+    .flow h2 { text-align: center; font-size: 32px; margin-bottom: 60px; }
+    .flow-grid { display: flex; flex-wrap: wrap; gap: 24px; justify-content: center; }
+    .flow-step { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 28px; width: 200px; text-align: center; transition: transform 0.2s, border-color 0.2s; }
+    .flow-step:hover { transform: translateY(-4px); border-color: #38bdf8; }
+    .flow-step .icon { font-size: 36px; margin-bottom: 12px; }
+    .flow-step h3 { font-size: 14px; margin-bottom: 8px; color: #38bdf8; }
+    .flow-step p { font-size: 12px; color: #64748b; }
+    .flow-arrow { font-size: 24px; color: #334155; display: flex; align-items: center; }
+
+    .features { padding: 80px 0; }
+    .features h2 { text-align: center; font-size: 32px; margin-bottom: 60px; }
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .feature { background: #111827; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; }
+    .feature .icon { font-size: 28px; margin-bottom: 16px; }
+    .feature h3 { font-size: 16px; margin-bottom: 8px; }
+    .feature p { font-size: 13px; color: #64748b; }
+
+    .tech { padding: 80px 0; text-align: center; }
+    .tech h2 { font-size: 32px; margin-bottom: 40px; }
+    .tech-stack { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+    .tech-badge { background: #1e293b; padding: 8px 20px; border-radius: 20px; font-size: 13px; color: #94a3b8; border: 1px solid #334155; }
+
+    .api-docs { padding: 80px 0; }
+    .api-docs h2 { text-align: center; font-size: 32px; margin-bottom: 40px; }
+    .endpoint { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+    .endpoint-method { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-right: 12px; }
+    .method-post { background: #065f46; color: #6ee7b7; }
+    .method-get { background: #1e3a5f; color: #93c5fd; }
+    .endpoint-path { font-family: monospace; font-size: 14px; color: #e2e8f0; }
+    .endpoint-desc { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+    footer { border-top: 1px solid #1e293b; padding: 40px 0; text-align: center; color: #475569; font-size: 13px; }
+    footer a { color: #38bdf8; text-decoration: none; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 32px; }
+      .features-grid { grid-template-columns: 1fr; }
+      .flow-step { width: 100%; }
+      .nav-links a { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav>
+      <div class="logo">Clear<span>Lens</span></div>
+      <div class="nav-links">
+        <a href="#how">How It Works</a>
+        <a href="#features">Features</a>
+        <a href="#tech">Tech</a>
+        <a href="#api">API</a>
+        <a href="/docs" target="_blank" class="btn btn-outline">API Docs</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div class="hero-badge">AI-Powered · Open Source · Privacy-First</div>
+      <h1>See Through<br><span>Misinformation</span></h1>
+      <p>ClearLens is a Chrome Extension that analyzes YouTube Shorts in real time — extracting claims, cross-referencing trusted sources, and delivering transparent, evidence-backed verdicts.</p>
+      <div class="hero-btns">
+        <a href="#how" class="btn btn-primary">How It Works</a>
+        <a href="https://github.com/HARSHIT071004/ClearLens-AI" target="_blank" class="btn btn-outline">GitHub</a>
+      </div>
+    </section>
+
+    <section id="how" class="flow">
+      <h2>How It Works</h2>
+      <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:center; align-items:center;">
+        <div class="flow-step"><div class="icon">📺</div><h3>1. Watch</h3><p>Browse YouTube Shorts as usual</p></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="icon">⚡</div><h3>2. Detect</h3><p>Extension flags high-risk claims locally</p></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="icon">🔍</div><h3>3. Verify</h3><p>Click "Verify" to start analysis</p></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="icon">🧠</div><h3>4. Analyze</h3><p>AI pipeline: transcript, OCR, RAG, LLM</p></div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step"><div class="icon">✅</div><h3>5. Result</h3><p>Get verdict with sources &amp; confidence</p></div>
+      </div>
+    </section>
+
+    <section id="features" class="features">
+      <h2>Why ClearLens?</h2>
+      <div class="features-grid">
+        <div class="feature"><div class="icon">🔍</div><h3>Hybrid RAG</h3><p>FAISS vector search + BM25 keyword + cross-encoder re-ranking for maximum relevance.</p></div>
+        <div class="feature"><div class="icon">🧠</div><h3>Multi-Model AI</h3><p>GPT-4o-mini reasoning, Gemini Flash OCR, Whisper STT, BERT embeddings.</p></div>
+        <div class="feature"><div class="icon">🔒</div><h3>User Isolation</h3><p>JWT authentication. Every user sees only their own history and data.</p></div>
+        <div class="feature"><div class="icon">⚡</div><h3>Local Detection</h3><p>Lightweight risk detector runs in-browser. No cost for safe content.</p></div>
+        <div class="feature"><div class="icon">📊</div><h3>Trust Score</h3><p>Calibrated confidence based on source reliability, contradictions, and evidence coverage.</p></div>
+        <div class="feature"><div class="icon">📝</div><h3>Transparent</h3><p>Every verdict includes source links and reasoning. Users verify the fact-checker.</p></div>
+      </div>
+    </section>
+
+    <section id="tech" class="tech">
+      <h2>Powered By</h2>
+      <div class="tech-stack">
+        <span class="tech-badge">FastAPI</span>
+        <span class="tech-badge">Python 3.12</span>
+        <span class="tech-badge">Chrome Extension MV3</span>
+        <span class="tech-badge">FAISS</span>
+        <span class="tech-badge">BM25</span>
+        <span class="tech-badge">Sentence-Transformers</span>
+        <span class="tech-badge">GPT-4o-mini</span>
+        <span class="tech-badge">Gemini Flash</span>
+        <span class="tech-badge">Whisper</span>
+        <span class="tech-badge">SQLite</span>
+        <span class="tech-badge">Redis</span>
+        <span class="tech-badge">Docker</span>
+        <span class="tech-badge">JWT Auth</span>
+        <span class="tech-badge">Cross-Encoder</span>
+        <span class="tech-badge">yt-dlp</span>
+      </div>
+    </section>
+
+    <section id="api" class="api-docs">
+      <h2>API Endpoints</h2>
+      <div class="endpoint">
+        <span class="endpoint-method method-post">POST</span>
+        <span class="endpoint-path">/auth/register</span>
+        <div class="endpoint-desc">Create a new account</div>
+      </div>
+      <div class="endpoint">
+        <span class="endpoint-method method-post">POST</span>
+        <span class="endpoint-path">/auth/login</span>
+        <div class="endpoint-desc">Login and receive JWT token</div>
+      </div>
+      <div class="endpoint">
+        <span class="endpoint-method method-post">POST</span>
+        <span class="endpoint-path">/api/v1/analyze</span>
+        <div class="endpoint-desc">Analyze a YouTube Short for misinformation</div>
+      </div>
+      <div class="endpoint">
+        <span class="endpoint-method method-get">GET</span>
+        <span class="endpoint-path">/api/v1/history</span>
+        <div class="endpoint-desc">Get your analysis history</div>
+      </div>
+      <div class="endpoint">
+        <span class="endpoint-method method-post">POST</span>
+        <span class="endpoint-path">/api/v1/feedback</span>
+        <div class="endpoint-desc">Submit feedback on a verdict</div>
+      </div>
+      <div class="endpoint">
+        <span class="endpoint-method method-get">GET</span>
+        <span class="endpoint-path">/api/v1/health</span>
+        <div class="endpoint-desc">Server health check</div>
+      </div>
+    </section>
+
+    <footer>
+      <p>ClearLens · <a href="https://github.com/HARSHIT071004/ClearLens-AI" target="_blank">GitHub</a> · <a href="/docs" target="_blank">API Docs</a> · Built with Python &amp; FastAPI</p>
+    </footer>
+  </div>
+</body>
+</html>

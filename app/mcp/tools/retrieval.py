@@ -1,11 +1,11 @@
-from typing import Optional
 from app.mcp.tools.base import Tool, ToolSpec
+from app.rag.engine import RAGEngine
 
 
 class RetrievalTool(Tool):
     spec = ToolSpec(
         name="retrieve_evidence",
-        description="Search trusted knowledge base for evidence relevant to a claim. Returns top matching documents.",
+        description="Search trusted knowledge base for evidence relevant to a claim. Returns top matching documents with hybrid search (FAISS + BM25 + cross-encoder re-ranking).",
         input_schema={
             "type": "object",
             "properties": {
@@ -16,28 +16,14 @@ class RetrievalTool(Tool):
         }
     )
 
-    def __init__(self, collection=None, embedding_fn=None):
-        self._collection = collection
-        self._embedding_fn = embedding_fn
+    def __init__(self, engine: RAGEngine = None):
+        self._engine = engine
 
     async def execute(self, query: str, top_k: int = 5) -> dict:
-        if not self._collection or not self._embedding_fn:
-            return {"results": [], "total": 0}
+        if not self._engine or self._engine.document_count == 0:
+            return {"results": [], "total": 0, "method": "none"}
         try:
-            embedding = await self._embedding_fn(query)
-            results = self._collection.query(
-                query_embeddings=[embedding],
-                n_results=top_k
-            )
-            docs = []
-            for i in range(len(results.get("ids", [[]])[0])):
-                doc = {
-                    "id": results["ids"][0][i],
-                    "content": results["documents"][0][i],
-                    "metadata": results["metadatas"][0][i] if results.get("metadatas") else {},
-                    "distance": results["distances"][0][i] if results.get("distances") else 0
-                }
-                docs.append(doc)
-            return {"results": docs, "total": len(docs)}
+            results = await self._engine.search(query, top_k=top_k)
+            return {"results": results, "total": len(results), "method": "hybrid"}
         except Exception as e:
-            return {"results": [], "total": 0, "error": str(e)}
+            return {"results": [], "total": 0, "error": str(e), "method": "none"}
