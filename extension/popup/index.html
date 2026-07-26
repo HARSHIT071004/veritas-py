@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClearLens</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>ClearLens</h1>
+      <span class="subtitle">Misinformation Checker</span>
+    </header>
+
+    <nav>
+      <button class="tab active" data-tab="dashboard">Dashboard</button>
+      <button class="tab" data-tab="history">History</button>
+    </nav>
+
+    <main>
+      <section id="dashboard" class="tab-content active">
+        <p class="tip">Watch a YouTube Short and click the <strong>Verify</strong> button to check it.</p>
+        <div id="stats">
+          <div class="stat">
+            <span class="stat-value" id="total-checked">0</span>
+            <span class="stat-label">Checked</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value" id="today-checked">0</span>
+            <span class="stat-label">Today</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="history" class="tab-content">
+        <div id="history-list">
+          <p class="empty">No videos checked yet.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

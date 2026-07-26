@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+data/
+dist/
+*.log
+.DS_Store
+hello.md
+ClearLens_Final_Technical_Plan.md
+ClearLens_Scaling_Strategy.md
+BUILD_SUMMARY.md
+server.err
+server.log
