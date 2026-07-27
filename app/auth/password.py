@@ -1,13 +1,12 @@
-import hashlib
-import secrets
+import bcrypt
 
 
 def hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    pwd_hash = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}${pwd_hash}"
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(password: str, stored: str) -> bool:
-    salt, pwd_hash = stored.split("$")
-    return hashlib.sha256((salt + password).encode()).hexdigest() == pwd_hash
+    try:
+        return bcrypt.checkpw(password.encode(), stored.encode())
+    except Exception:
+        return False

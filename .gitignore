@@ -58,3 +58,10 @@ SYSTEM_DESIGN_REVIEW.md
 # Change summaries
 pipeline_improvements.md
 architecture_refactor.md
+phase1_5_phase2_implementation.md
+
+# Design specs continued
+design3.md
+
+# Evaluation outputs
+app/evaluation/__pycache__/

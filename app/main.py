@@ -19,23 +19,21 @@ from app.mcp.tools.classifier import ClassifierTool
 from app.mcp.resources.knowledge import KnowledgeResource
 from app.mcp.resources.cache import CacheResource
 from app.api.routes import router as api_router
-from app.api.routes import init_routes as init_api_routes
 from app.auth.routes import router as auth_router
 from app.auth.routes import init_routes as init_auth_routes
+from app.api.deps import app_state
 from app.pipeline.analyzer import Analyzer
 from app.middleware.logging import setup_logging
 from app.middleware.error_handler import ErrorHandlerMiddleware, RequestValidationMiddleware
 from seed.knowledge import seed_knowledge_base
 
-db: Database = None
 mcp: MCPServer = None
 rag_engine: RAGEngine = None
-redis_cache: RedisCache = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, mcp, rag_engine, redis_cache
+    global mcp, rag_engine
 
     logger = setup_logging(settings.log_level, settings.log_file)
     Path("data").mkdir(exist_ok=True)
@@ -43,7 +41,6 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ClearLens server", extra={"port": settings.port, "debug": settings.debug})
 
     db = Database(settings.database_path)
-
     redis_cache = RedisCache()
 
     rag_engine = RAGEngine(persist_dir=settings.rag_persist_dir)
@@ -78,9 +75,8 @@ async def lifespan(app: FastAPI):
             logger.info(f"Seeded RAG engine with {len(docs)} knowledge documents")
 
     ingestion_pipeline = IngestionPipeline(rag_engine)
-    analyzer = Analyzer(db)
+    app_state.init(db=db, cache=redis_cache)
 
-    init_api_routes(analyzer, db, redis_cache)
     init_auth_routes(db)
 
     app.include_router(auth_router)

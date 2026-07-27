@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.auth.password import hash_password, verify_password
-from app.auth.jwt import create_token, decode_token
+from app.auth.jwt import create_access_token, create_refresh_token, decode_token
 from app.auth.dependencies import get_current_user_id
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -23,7 +23,8 @@ class LoginRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     success: bool
-    token: Optional[str] = None
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
     user_id: Optional[str] = None
     error: Optional[str] = None
 
@@ -37,8 +38,7 @@ async def register(req: RegisterRequest):
     if existing:
         return AuthResponse(success=False, error="Email already registered")
     user_id = _db.create_user(req.email, hash_password(req.password), req.name)
-    token = create_token(user_id)
-    return AuthResponse(success=True, token=token, user_id=user_id)
+    return AuthResponse(success=True, access_token=create_access_token(user_id), refresh_token=create_refresh_token(user_id), user_id=user_id)
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -49,8 +49,7 @@ async def login(req: LoginRequest):
     user = _db.get_user_by_email(req.email)
     if not user or not verify_password(req.password, user["password_hash"]):
         return AuthResponse(success=False, error="Invalid email or password")
-    token = create_token(user["id"])
-    return AuthResponse(success=True, token=token, user_id=user["id"])
+    return AuthResponse(success=True, access_token=create_access_token(user["id"]), refresh_token=create_refresh_token(user["id"]), user_id=user["id"])
 
 
 @router.post("/refresh", response_model=AuthResponse)
@@ -60,8 +59,9 @@ async def refresh(authorization: Optional[str] = Header(None)):
     payload = decode_token(authorization[7:])
     if not payload:
         return AuthResponse(success=False, error="Invalid or expired token")
-    new_token = create_token(payload["sub"])
-    return AuthResponse(success=True, token=new_token, user_id=payload["sub"])
+    if payload.get("type") != "refresh":
+        return AuthResponse(success=False, error="Invalid token type")
+    return AuthResponse(success=True, access_token=create_access_token(payload["sub"]), refresh_token=create_refresh_token(payload["sub"]), user_id=payload["sub"])
 
 
 @router.get("/me")
