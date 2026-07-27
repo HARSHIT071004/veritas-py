@@ -44,3 +44,17 @@ server.log
 
 # Downloaded binaries
 ffmpeg.exe
+
+# Design specs
+design1.md
+design2.md
+current basic.md
+
+# Review files
+CODE_REVIEW.md
+CURRENT_STATUS.md
+SYSTEM_DESIGN_REVIEW.md
+
+# Change summaries
+pipeline_improvements.md
+architecture_refactor.md

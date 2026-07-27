@@ -15,6 +15,7 @@ from app.mcp.tools.vision import VisionTool
 from app.mcp.tools.retrieval import RetrievalTool
 from app.mcp.tools.reason import ReasonTool
 from app.mcp.tools.claim_extractor import ClaimExtractorTool
+from app.mcp.tools.classifier import ClassifierTool
 from app.mcp.resources.knowledge import KnowledgeResource
 from app.mcp.resources.cache import CacheResource
 from app.api.routes import router as api_router
@@ -59,6 +60,7 @@ async def lifespan(app: FastAPI):
     mcp.register_tool(RetrievalTool(engine=rag_engine))
     mcp.register_tool(ReasonTool())
     mcp.register_tool(ClaimExtractorTool())
+    mcp.register_tool(ClassifierTool())
 
     knowledge = KnowledgeResource()
     cache_res = CacheResource(db)
@@ -76,7 +78,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"Seeded RAG engine with {len(docs)} knowledge documents")
 
     ingestion_pipeline = IngestionPipeline(rag_engine)
-    analyzer = Analyzer(mcp, db)
+    analyzer = Analyzer(db)
 
     init_api_routes(analyzer, db, redis_cache)
     init_auth_routes(db)
