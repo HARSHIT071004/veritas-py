@@ -46,14 +46,26 @@ class TranscriptTool(Tool):
         return None
 
     async def _whisper_transcribe(self, video_id: str) -> Optional[str]:
-        if not settings.openai_api_key:
+        if not settings.groq_api_key and not settings.openai_api_key:
             return None
         audio_path = None
         try:
             audio_path = await self._download_audio(video_id)
             if not audio_path:
                 return None
-            return await self._send_to_whisper(audio_path)
+            if settings.groq_api_key:
+                return await self._send_to_whisper(
+                    audio_path,
+                    api_key=settings.groq_api_key,
+                    model=settings.groq_stt_model,
+                    endpoint="https://api.groq.com/openai/v1/audio/transcriptions"
+                )
+            return await self._send_to_whisper(
+                audio_path,
+                api_key=settings.openai_api_key,
+                model="whisper-1",
+                endpoint="https://api.openai.com/v1/audio/transcriptions"
+            )
         except Exception:
             return None
         finally:
@@ -70,9 +82,15 @@ class TranscriptTool(Tool):
             tmp.close()
             output = tmp.name.replace(".mp3", "")
 
+            ffmpeg_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "ffmpeg.exe")
+            ffmpeg_path = os.path.abspath(ffmpeg_path)
+            if not os.path.exists(ffmpeg_path):
+                ffmpeg_path = "ffmpeg"
+
             ydl_opts = {
                 "format": "bestaudio/best",
                 "outtmpl": output,
+                "ffmpeg_location": ffmpeg_path,
                 "postprocessors": [{
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
@@ -93,16 +111,16 @@ class TranscriptTool(Tool):
         except Exception:
             return None
 
-    async def _send_to_whisper(self, audio_path: str) -> Optional[str]:
+    async def _send_to_whisper(self, audio_path: str, api_key: str, model: str, endpoint: str) -> Optional[str]:
         try:
             import httpx
             with open(audio_path, "rb") as f:
                 async with httpx.AsyncClient(timeout=60) as client:
                     resp = await client.post(
-                        "https://api.openai.com/v1/audio/transcriptions",
-                        headers={"Authorization": f"Bearer {settings.openai_api_key}"},
+                        endpoint,
+                        headers={"Authorization": f"Bearer {api_key}"},
                         files={"file": (os.path.basename(audio_path), f, "audio/mpeg")},
-                        data={"model": "whisper-1", "response_format": "json"}
+                        data={"model": model, "response_format": "json"}
                     )
                     if resp.status_code == 200:
                         return resp.json().get("text")

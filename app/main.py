@@ -14,6 +14,7 @@ from app.mcp.tools.transcript import TranscriptTool
 from app.mcp.tools.vision import VisionTool
 from app.mcp.tools.retrieval import RetrievalTool
 from app.mcp.tools.reason import ReasonTool
+from app.mcp.tools.claim_extractor import ClaimExtractorTool
 from app.mcp.resources.knowledge import KnowledgeResource
 from app.mcp.resources.cache import CacheResource
 from app.api.routes import router as api_router
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
     mcp.register_tool(VisionTool())
     mcp.register_tool(RetrievalTool(engine=rag_engine))
     mcp.register_tool(ReasonTool())
+    mcp.register_tool(ClaimExtractorTool())
 
     knowledge = KnowledgeResource()
     cache_res = CacheResource(db)

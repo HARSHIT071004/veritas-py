@@ -10,6 +10,17 @@ class Settings(BaseSettings):
 
     openai_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    groq_stt_model: str = "whisper-large-v3-turbo"
+
+    openrouter_api_key: Optional[str] = None
+    openrouter_model: str = "google/gemma-4-26b-a4b-it:free"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    paddle_ocr_enabled: bool = True
+    easy_ocr_enabled: bool = True
+    opencv_frames_enabled: bool = True
+    opencv_frame_interval: int = 30
 
     database_path: str = "data/clearlens.db"
     cache_ttl_seconds: int = 86400

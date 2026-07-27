@@ -6,13 +6,41 @@ data/
 dist/
 *.log
 .DS_Store
-hello.md
+
+# Planning docs (not code)
+BUILD_SUMMARY.md
 ClearLens_Final_Technical_Plan.md
 ClearLens_Scaling_Strategy.md
-BUILD_SUMMARY.md
 DEV_NOTES.md
 DISCONNECTED_COMPONENTS.md
-PRODUCTION_READINESS_REVIEW.md
+FAKE_VS_REAL_AUDIT.md
+FOCUSED_PIPELINE.md
+HOSTING_PLAN.md
+Ideal.md
 missing.md
+MODEL_HOSTING_RECOMMENDATIONS.md
+ocr.md
+PADDLE_GROQ_STATUS.md
+PIPELINE_FLOW_DIAGRAM.md
+PIPELINE_TEST_REPORT.md
+POV_ON_IDEAL.md
+PRODUCTION_READINESS_REVIEW.md
+REMAINING_WORK.md
+hello.md
+
+# Temp test scripts
+check_status.py
+test_full_pipeline.py
+test_groq.py
+test_openrouter.py
+test_pipeline.py
+get_yt_meta.py
+
+# Generated outputs
+test_pipeline_result.json
+test_pipeline_result.md
 server.err
 server.log
+
+# Downloaded binaries
+ffmpeg.exe

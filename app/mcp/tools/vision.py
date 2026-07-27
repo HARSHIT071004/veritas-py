@@ -1,6 +1,10 @@
+import base64
+import logging
 from typing import Optional
 from app.mcp.tools.base import Tool, ToolSpec
 from app.config import settings
+
+logger = logging.getLogger("clearlens")
 
 
 class VisionTool(Tool):
@@ -20,7 +24,7 @@ class VisionTool(Tool):
     async def execute(self, video_id: str, claim_text: str) -> dict:
         if not self._needs_vision(claim_text):
             return {"ocr_text": None, "used": False, "reason": "skipped"}
-        frames = await self._extract_keyframes(video_id)
+        frames = await self._extract_frames(video_id)
         if not frames:
             return {"ocr_text": None, "used": True, "reason": "no_frames"}
         text = await self._ocr_frames(frames)
@@ -35,51 +39,105 @@ class VisionTool(Tool):
         ]
         return any(t in claim.lower() for t in triggers)
 
-    async def _extract_keyframes(self, video_id: str) -> Optional[list[str]]:
+    async def _extract_frames(self, video_id: str) -> Optional[list[bytes]]:
         frames = []
+
+        # Try OpenCV-based frames from downloaded video first
+        if settings.opencv_frames_enabled:
+            try:
+                from app.vision.frames import extract_frames
+                cv_frames = await extract_frames(video_id)
+                if cv_frames:
+                    frames.extend(cv_frames)
+            except Exception:
+                pass
+
+        # Fall back to YouTube thumbnails
+        if not frames:
+            frames = await self._fetch_thumbnails(video_id)
+
+        return frames if frames else None
+
+    async def _fetch_thumbnails(self, video_id: str) -> list[bytes]:
         import httpx
         import asyncio
-        import base64
 
+        frames = []
         async with httpx.AsyncClient() as client:
-            thumbnail_urls = [
+            urls = [
                 f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg",
                 f"https://img.youtube.com/vi/{video_id}/sddefault.jpg",
                 f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg",
                 f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
             ]
-            tasks = [client.get(url, timeout=10) for url in thumbnail_urls]
+            tasks = [client.get(url, timeout=10) for url in urls]
             responses = await asyncio.gather(*tasks, return_exceptions=True)
 
             for resp in responses:
                 if isinstance(resp, Exception) or resp.status_code != 200:
                     continue
-                b64 = base64.b64encode(resp.content).decode()
-                frames.append(f"data:image/jpeg;base64,{b64}")
+                frames.append(resp.content)
                 if len(frames) >= 3:
                     break
+        return frames
 
-        return frames if frames else None
-
-    async def _ocr_frames(self, frames: list[str]) -> str:
-        if not settings.gemini_api_key:
-            return ""
+    async def _ocr_frames(self, frames: list[bytes]) -> str:
         extracted = []
-        for frame in frames:
-            text = await self._gemini_ocr(frame)
+        for raw in frames:
+            text = await self._ocr_single(raw)
             if text:
                 extracted.append(text)
         return "\n---\n".join(extracted)
 
-    async def _gemini_ocr(self, image_b64: str) -> Optional[str]:
+    async def _ocr_single(self, image_bytes: bytes) -> Optional[str]:
+        engines = []
+
+        if settings.paddle_ocr_enabled:
+            engines.append(("paddle-vl", self._ocr_paddle_vl))
+            engines.append(("paddle", self._ocr_paddle))
+        if settings.easy_ocr_enabled:
+            engines.append(("easyocr", self._ocr_easy))
+        engines.append(("gemini", self._ocr_gemini))
+
+        for name, method in engines:
+            try:
+                text = await method(image_bytes)
+                if text:
+                    return text
+            except Exception:
+                pass
+        return None
+
+    async def _ocr_paddle_vl(self, image_bytes: bytes) -> Optional[str]:
+        from app.vision.paddle_ocr_vl import ocr_image, is_available
+        if not is_available():
+            return None
+        return await ocr_image(image_bytes)
+
+    async def _ocr_paddle(self, image_bytes: bytes) -> Optional[str]:
+        from app.vision.paddle_ocr import ocr_image, is_available
+        if not is_available():
+            return None
+        return await ocr_image(image_bytes)
+
+    async def _ocr_easy(self, image_bytes: bytes) -> Optional[str]:
+        from app.vision.easy_ocr import ocr_image, is_available
+        if not is_available():
+            return None
+        return await ocr_image(image_bytes)
+
+    async def _ocr_gemini(self, image_bytes: bytes) -> Optional[str]:
+        if not settings.gemini_api_key:
+            return None
         try:
             import httpx
+            b64 = base64.b64encode(image_bytes).decode()
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.gemini_api_key}"
             payload = {
                 "contents": [{
                     "parts": [
                         {"text": "Extract all visible text from this image. Include headlines, captions, overlays, meme text, and any text in screenshots. Return only the extracted text, no commentary."},
-                        {"inline_data": {"mime_type": "image/jpeg", "data": image_b64.split(",")[-1]}}
+                        {"inline_data": {"mime_type": "image/jpeg", "data": b64}}
                     ]
                 }]
             }

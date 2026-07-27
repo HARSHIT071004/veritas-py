@@ -1,6 +1,7 @@
 import json
 from app.mcp.tools.base import Tool, ToolSpec
 from app.config import settings
+from app.llm.client import call_llm, parse_json_response
 
 
 class ReasonTool(Tool):
@@ -20,11 +21,16 @@ class ReasonTool(Tool):
     )
 
     async def execute(self, claim: str, transcript: str = "", ocr_text: str = "", evidence: list = None) -> dict:
-        if not settings.openai_api_key:
+        if not settings.openrouter_api_key and not settings.openai_api_key:
             return self._fallback_verdict(claim)
         evidence = evidence or []
         prompt = self._build_prompt(claim, transcript, ocr_text, evidence)
-        return await self._call_llm(prompt)
+        content = await call_llm(prompt, max_tokens=1000, temperature=0.1)
+        if content:
+            parsed = parse_json_response(content)
+            if parsed:
+                return parsed
+        return self._fallback_verdict(claim)
 
     def _build_prompt(self, claim: str, transcript: str, ocr_text: str, evidence: list[str]) -> str:
         ctx_parts = []
@@ -57,31 +63,6 @@ Rules:
 - Return "unverifiable" if evidence is insufficient
 - Never guess. Lack of evidence is not proof of falsehood.
 - Confidence must reflect how strongly evidence supports the verdict."""
-
-    async def _call_llm(self, prompt: str) -> dict:
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.openai_api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "gpt-4o-mini",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "temperature": 0.1,
-                        "max_tokens": 1000
-                    }
-                )
-                if resp.status_code == 200:
-                    content = resp.json()["choices"][0]["message"]["content"]
-                    content = content.strip().removeprefix("```json").removesuffix("```").strip()
-                    return json.loads(content)
-        except Exception:
-            pass
-        return self._fallback_verdict(prompt[:100])
 
     def _fallback_verdict(self, claim: str) -> dict:
         return {
