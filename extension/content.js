@@ -87,16 +87,20 @@ function showVerifyBadge(videoId) {
     };
 
     chrome.runtime.sendMessage({
-      type: "ANALYZE",
+      type: "ANALYZE_ASYNC",
       videoId,
       metadata
     }, (response) => {
-      if (response?.success && response.result) {
+      if (response?.success && response.job_id) {
+        btn.textContent = "Waiting for result...";
+        btn.style.background = "#3b82f6";
+        startPolling(videoId, response.job_id, btn);
+      } else if (response?.success && response.result) {
         showResultCard(response.result);
         chrome.storage.local.set({ ["analyzed_" + videoId]: true });
         badge.remove();
       } else {
-        btn.textContent = "⚠ Error - Try Again";
+        btn.textContent = "Error - Try Again";
         btn.disabled = false;
         btn.style.background = "#ff4444";
       }
@@ -118,6 +122,14 @@ function assessRisk(title, channel) {
   if (matchCount >= 2) return "high";
   if (matchCount === 1) return "medium";
   return "low";
+}
+
+function startPolling(videoId, jobId, btn) {
+  chrome.runtime.sendMessage({
+    type: "POLL_RESULT",
+    jobId,
+    tabId: undefined
+  });
 }
 
 function showResultCard(result) {
@@ -163,11 +175,11 @@ function showResultCard(result) {
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;">
         <button data-rating="helpful" style="flex:1;padding:6px;border:1px solid #d1d5db;
-                border-radius:8px;background:white;cursor:pointer;font-size:12px;">👍 Helpful</button>
+                border-radius:8px;background:white;cursor:pointer;font-size:12px;">Helpful</button>
         <button data-rating="not_helpful" style="flex:1;padding:6px;border:1px solid #d1d5db;
-                border-radius:8px;background:white;cursor:pointer;font-size:12px;">👎 Not helpful</button>
+                border-radius:8px;background:white;cursor:pointer;font-size:12px;">Not helpful</button>
         <button id="clearlens-close" style="padding:6px 10px;border:1px solid #d1d5db;
-                border-radius:8px;background:white;cursor:pointer;font-size:12px;">✕</button>
+                border-radius:8px;background:white;cursor:pointer;font-size:12px;">Close</button>
       </div>
     </div>
   `;

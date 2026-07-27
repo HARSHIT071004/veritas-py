@@ -17,6 +17,7 @@
       <button class="tab active" data-tab="dashboard">Dashboard</button>
       <button class="tab" data-tab="history">History</button>
       <button class="tab" data-tab="account">Account</button>
+      <button class="tab" data-tab="settings">Settings</button>
     </nav>
 
     <main>
@@ -61,6 +62,15 @@
           <button id="logout-btn" class="btn-secondary">Logout</button>
         </div>
         <div id="auth-error" class="error-msg" style="display:none;"></div>
+      </section>
+
+      <section id="settings" class="tab-content">
+        <h3>Settings</h3>
+        <label>API Base URL</label>
+        <input type="url" id="api-url" placeholder="http://localhost:8000">
+        <p class="help-text">Where the ClearLens API is running.</p>
+        <button id="save-settings" class="btn-primary">Save</button>
+        <div id="settings-msg" class="success-msg" style="display:none;"></div>
       </section>
     </main>
   </div>

@@ -20,11 +20,12 @@ from app.mcp.resources.knowledge import KnowledgeResource
 from app.mcp.resources.cache import CacheResource
 from app.api.routes import router as api_router
 from app.auth.routes import router as auth_router
-from app.auth.routes import init_routes as init_auth_routes
+
 from app.api.deps import app_state
 from app.pipeline.analyzer import Analyzer
 from app.middleware.logging import setup_logging
 from app.middleware.error_handler import ErrorHandlerMiddleware, RequestValidationMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 from seed.knowledge import seed_knowledge_base
 
 mcp: MCPServer = None
@@ -42,6 +43,10 @@ async def lifespan(app: FastAPI):
 
     db = Database(settings.database_path)
     redis_cache = RedisCache()
+    if redis_cache._enabled:
+        logger.info("Redis is enabled and configured")
+    else:
+        logger.warning("Redis is not available — caching, job queue, and rate limiting will be disabled")
 
     rag_engine = RAGEngine(persist_dir=settings.rag_persist_dir)
     loaded = rag_engine.load()
@@ -77,10 +82,7 @@ async def lifespan(app: FastAPI):
     ingestion_pipeline = IngestionPipeline(rag_engine)
     app_state.init(db=db, cache=redis_cache)
 
-    init_auth_routes(db)
-
-    app.include_router(auth_router)
-    app.include_router(api_router, prefix="/api/v1")
+    app.add_middleware(RateLimitMiddleware, redis_cache=redis_cache)
 
     logger.info("Server startup complete", extra={"tools": len(mcp.list_tools()), "resources": len(mcp.list_resources())})
 
@@ -106,6 +108,9 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+app.include_router(auth_router)
+app.include_router(api_router, prefix="/api/v1")
 
 ext_path = Path(__file__).parent.parent / "extension"
 if ext_path.exists():

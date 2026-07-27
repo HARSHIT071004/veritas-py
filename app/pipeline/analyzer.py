@@ -3,17 +3,18 @@ from typing import Optional
 from app.pipeline.orchestrator import PipelineOrchestrator
 from app.data.database import Database
 from app.data.models import AnalysisResult
+from app.data.repositories.analysis_repository import AnalysisRepository
 
 logger = logging.getLogger("clearlens.analyzer")
 
 
 class Analyzer:
     def __init__(self, db: Database):
-        self.db = db
+        self._repo = AnalysisRepository(db)
         self._orchestrator = PipelineOrchestrator()
 
     async def analyze(self, video_id: str, metadata: dict, user_id: str) -> dict:
-        cached = self.db.get_cached(video_id)
+        cached = self._repo.get_cached(video_id)
         if cached:
             return cached
 
@@ -51,7 +52,7 @@ class Analyzer:
         )
 
         result_dict["trust_label"] = result_dict.get("trust_label", "very low")
-        self.db.set_cache(video_id, result_dict)
-        self.db.save_history(result)
+        self._repo.set_cache(video_id, result_dict)
+        self._repo.save_history(result)
 
         return result_dict

@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, Header, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 from app.auth.password import hash_password, verify_password
 from app.auth.jwt import create_access_token, create_refresh_token, decode_token
 from app.auth.dependencies import get_current_user_id
+from app.api.deps import get_db
+from app.data.database import Database
+from app.data.repositories.user_repository import UserRepository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-_db = None
 
 
 class RegisterRequest(BaseModel):
@@ -30,23 +31,19 @@ class AuthResponse(BaseModel):
 
 
 @router.post("/register", response_model=AuthResponse)
-async def register(req: RegisterRequest):
-    global _db
-    if not _db:
-        return AuthResponse(success=False, error="Server not ready")
-    existing = _db.get_user_by_email(req.email)
+async def register(req: RegisterRequest, db: Database = Depends(get_db)):
+    users = UserRepository(db)
+    existing = users.get_by_email(req.email)
     if existing:
         return AuthResponse(success=False, error="Email already registered")
-    user_id = _db.create_user(req.email, hash_password(req.password), req.name)
+    user_id = users.create(req.email, hash_password(req.password), req.name)
     return AuthResponse(success=True, access_token=create_access_token(user_id), refresh_token=create_refresh_token(user_id), user_id=user_id)
 
 
 @router.post("/login", response_model=AuthResponse)
-async def login(req: LoginRequest):
-    global _db
-    if not _db:
-        return AuthResponse(success=False, error="Server not ready")
-    user = _db.get_user_by_email(req.email)
+async def login(req: LoginRequest, db: Database = Depends(get_db)):
+    users = UserRepository(db)
+    user = users.get_by_email(req.email)
     if not user or not verify_password(req.password, user["password_hash"]):
         return AuthResponse(success=False, error="Invalid email or password")
     return AuthResponse(success=True, access_token=create_access_token(user["id"]), refresh_token=create_refresh_token(user["id"]), user_id=user["id"])
@@ -65,16 +62,9 @@ async def refresh(authorization: Optional[str] = Header(None)):
 
 
 @router.get("/me")
-async def get_me(user_id: str = Depends(get_current_user_id)):
-    global _db
-    if not _db:
-        return {"error": "Server not ready"}
-    user = _db.get_user(user_id)
+async def get_me(user_id: str = Depends(get_current_user_id), db: Database = Depends(get_db)):
+    users = UserRepository(db)
+    user = users.get_by_id(user_id)
     if not user:
         return {"error": "User not found"}
     return {"id": user["id"], "email": user["email"], "name": user["name"]}
-
-
-def init_routes(db):
-    global _db
-    _db = db
