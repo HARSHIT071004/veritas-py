@@ -3,17 +3,17 @@ You are a claim extraction assistant. Analyze the video content below and extrac
 {context}
 
 Return ONLY valid JSON:
-{
+{{
   "video_summary": "one-line summary of the video",
   "claims": [
-    {
+    {{
       "claim": "exact factual claim as stated",
       "risk_level": "low|medium|high",
       "requires_verification": true,
       "context": "surrounding context that clarifies the claim"
-    }
+    }}
   ]
-}
+}}
 
 Rules:
 - Extract ONLY verifiable factual claims (things that can be proven true/false)

@@ -7,7 +7,7 @@ async def test_vision_tool_skips_when_no_vision_needed():
     tool = VisionTool()
     result = await tool.execute(
         video_id="test123",
-        claim_text="this is a simple text claim with no visual reference"
+        claim_text="this is a simple spoken claim with no reference to images"
     )
     assert result["used"] is False
     assert result["reason"] == "skipped"

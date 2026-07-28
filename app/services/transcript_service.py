@@ -8,15 +8,38 @@ from app.schemas.pipeline_models import TranscriptResult
 
 logger = logging.getLogger("clearlens.services.transcript")
 
+_transcript_cache: dict[str, TranscriptResult] = {}
+
 
 class TranscriptService:
     async def extract(self, video_id: str) -> TranscriptResult:
-        result = await self._fetch_transcript(video_id)
+        if video_id in _transcript_cache:
+            cached = _transcript_cache[video_id]
+            logger.info(f"Transcript cache hit for {video_id}")
+            return cached
+
+        result = await self._fetch_youtube_transcript(video_id)
         if result:
-            return TranscriptResult(**result, source="youtube_api")
-        text = await self._whisper_transcribe(video_id)
-        if text:
-            return TranscriptResult(text=text, language="unknown", duration=0, source="whisper")
+            _transcript_cache[video_id] = result
+            return result
+
+        result = await self._fetch_youtube_captions(video_id)
+        if result:
+            _transcript_cache[video_id] = result
+            return result
+
+        result = await self._whisper_transcribe(video_id, provider="groq")
+        if result:
+            r = TranscriptResult(text=result, language="unknown", duration=0, source="groq_whisper")
+            _transcript_cache[video_id] = r
+            return r
+
+        result = await self._whisper_transcribe(video_id, provider="openai")
+        if result:
+            r = TranscriptResult(text=result, language="unknown", duration=0, source="openai_whisper")
+            _transcript_cache[video_id] = r
+            return r
+
         return TranscriptResult(source=None)
 
     def _clean(self, text: str) -> str:
@@ -33,7 +56,7 @@ class TranscriptService:
         dur = last.get("duration", 0)
         return int((offset + dur) / 1000) if dur else int(offset / 1000)
 
-    async def _fetch_transcript(self, video_id: str) -> Optional[dict]:
+    async def _fetch_youtube_transcript(self, video_id: str) -> Optional[TranscriptResult]:
         import httpx
         languages = ["hi", "en", "hinglish", "aae", "en-US", "en-GB"]
         for lang in languages:
@@ -49,23 +72,47 @@ class TranscriptService:
                             text = " ".join(seg.get("text", "") for seg in data)
                             text = self._clean(text)
                             duration = self._get_duration(data)
-                            return {"text": text, "language": lang, "duration": duration}
+                            return TranscriptResult(text=text, language=lang, duration=duration, source="youtube_transcript")
                         if isinstance(data, dict) and "text" in data:
                             text = self._clean(data["text"])
-                            return {"text": text, "language": lang, "duration": 0}
+                            return TranscriptResult(text=text, language=lang, duration=0, source="youtube_transcript")
             except Exception as e:
                 logger.debug(f"YouTube transcript API failed for lang={lang}: {e}")
         return None
 
-    async def _whisper_transcribe(self, video_id: str) -> Optional[str]:
-        if not settings.groq_api_key and not settings.openai_api_key:
+    async def _fetch_youtube_captions(self, video_id: str) -> Optional[TranscriptResult]:
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(
+                    f"https://youtubetranscript.com/api?vid={video_id}",
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if isinstance(data, list):
+                        text = " ".join(seg.get("text", "") for seg in data)
+                        text = self._clean(text)
+                        duration = self._get_duration(data)
+                        return TranscriptResult(text=text, language="en", duration=duration, source="youtube_caption")
+                    if isinstance(data, dict) and "text" in data:
+                        text = self._clean(data["text"])
+                        return TranscriptResult(text=text, language="en", duration=0, source="youtube_caption")
+        except Exception as e:
+            logger.debug(f"YouTube captions failed: {e}")
+        return None
+
+    async def _whisper_transcribe(self, video_id: str, provider: str = "groq") -> Optional[str]:
+        if provider == "groq" and not settings.groq_api_key:
+            return None
+        if provider == "openai" and not settings.openai_api_key:
             return None
         audio_path = None
         try:
             audio_path = await self._download_audio(video_id)
             if not audio_path:
                 return None
-            if settings.groq_api_key:
+            if provider == "groq":
                 return await self._send_to_whisper(
                     audio_path, api_key=settings.groq_api_key,
                     model=settings.groq_stt_model,
@@ -77,7 +124,7 @@ class TranscriptService:
                 endpoint="https://api.openai.com/v1/audio/transcriptions"
             )
         except Exception as e:
-            logger.error(f"Whisper transcribe failed: {e}")
+            logger.error(f"Whisper ({provider}) transcribe failed: {e}")
             return None
         finally:
             if audio_path and os.path.exists(audio_path):

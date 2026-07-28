@@ -14,14 +14,14 @@ Claims to classify:
 {items}
 
 Return ONLY valid JSON:
-{
+{{
   "classifications": [
-    {
+    {{
       "claim_index": 0,
       "category": "health|political|scientific|financial|conspiracy|opinion|satire|general",
       "confidence": 0.0-1.0
-    }
+    }}
   ]
-}
+}}
 
 Match the claim_index to the order above (0-based).

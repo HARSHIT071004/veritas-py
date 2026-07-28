@@ -13,5 +13,6 @@ async def test_transcript_tool_spec():
 async def test_transcript_tool_returns_dict():
     tool = TranscriptTool()
     result = await tool.execute(video_id="invalid_test_id")
-    assert "transcript" in result
+    assert "text" in result
     assert "source" in result
+    assert "language" in result
