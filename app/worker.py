@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from app.config import settings
 from app.data.cache import RedisCache
 from app.pipeline.orchestrator import PipelineOrchestrator
+from app.pipeline.cache import MultiLevelCache
 from app.schemas.job import Job, JobStatus
 
 logger = logging.getLogger("clearlens.worker")
@@ -48,7 +49,8 @@ async def run_analysis_job(ctx, video_id: str, user_id: str, metadata: dict):
     job_id = await create_job(video_id, user_id, redis_cache)
     try:
         await update_job(job_id, redis_cache, JobStatus.processing, progress="Starting analysis")
-        orchestrator = PipelineOrchestrator()
+        cache = MultiLevelCache(redis=redis_cache)
+        orchestrator = PipelineOrchestrator(cache=cache)
         result = await orchestrator.run(video_id, metadata)
         if result.result:
             await update_job(job_id, redis_cache, JobStatus.completed, result=result.result, progress="Completed")

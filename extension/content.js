@@ -13,7 +13,16 @@ const TRUSTED_CHANNELS = [
   "reuters", "associated press", "crash course"
 ];
 
+const PROGRESS_STAGES = [
+  "Preparing video",
+  "Fetching transcript",
+  "Analyzing claims",
+  "Generating verdict",
+  "Finalizing result"
+];
+
 let observer = null;
+let backgroundTimer = null;
 
 function init() {
   const existing = document.getElementById("clearlens-badge");
@@ -38,9 +47,18 @@ function checkCurrentShort() {
   const videoId = pathParts[pathParts.length - 1];
   if (!videoId || videoId.length < 5) return;
 
-  chrome.storage.local.get(["analyzed_" + videoId], (data) => {
+  chrome.storage.local.get(["analyzed_" + videoId, "bg_enabled"], (data) => {
     if (data["analyzed_" + videoId]) return;
+
+    chrome.runtime.sendMessage({ type: "PREFETCH", videoId });
     showVerifyBadge(videoId);
+
+    if (data.bg_enabled !== false) {
+      if (backgroundTimer) clearTimeout(backgroundTimer);
+      backgroundTimer = setTimeout(() => {
+        chrome.runtime.sendMessage({ type: "PREFETCH", videoId, background: true });
+      }, 3000);
+    }
   });
 }
 
@@ -75,9 +93,11 @@ function showVerifyBadge(videoId) {
   btn.onmouseleave = () => { btn.style.opacity = "1"; };
 
   btn.onclick = async () => {
-    btn.textContent = "Analyzing...";
+    if (backgroundTimer) clearTimeout(backgroundTimer);
+
+    btn.textContent = "Analyzing claims...";
     btn.disabled = true;
-    btn.style.background = "#666";
+    btn.style.background = "#3b82f6";
 
     const metadata = {
       title,
@@ -86,20 +106,24 @@ function showVerifyBadge(videoId) {
       hashtags: (title.match(/#\w+/g) || []).map(h => h.slice(1))
     };
 
+    const progressInterval = startProgressAnimation(btn);
+
     chrome.runtime.sendMessage({
       type: "ANALYZE_ASYNC",
       videoId,
       metadata
     }, (response) => {
       if (response?.success && response.job_id) {
+        clearInterval(progressInterval);
         btn.textContent = "Waiting for result...";
-        btn.style.background = "#3b82f6";
-        startPolling(videoId, response.job_id, btn);
+        startPollingWithProgress(videoId, response.job_id, btn, progressInterval);
       } else if (response?.success && response.result) {
+        clearInterval(progressInterval);
         showResultCard(response.result);
         chrome.storage.local.set({ ["analyzed_" + videoId]: true });
         badge.remove();
       } else {
+        clearInterval(progressInterval);
         btn.textContent = "Error - Try Again";
         btn.disabled = false;
         btn.style.background = "#ff4444";
@@ -108,6 +132,24 @@ function showVerifyBadge(videoId) {
   };
 
   document.body.appendChild(badge);
+}
+
+function startProgressAnimation(btn) {
+  let stage = 1;
+  return setInterval(() => {
+    if (stage < PROGRESS_STAGES.length) {
+      btn.textContent = PROGRESS_STAGES[stage] + "...";
+      stage++;
+    }
+  }, 3000);
+}
+
+function startPollingWithProgress(videoId, jobId, btn, progressInterval) {
+  chrome.runtime.sendMessage({
+    type: "POLL_RESULT",
+    jobId,
+    tabId: undefined
+  });
 }
 
 function assessRisk(title, channel) {

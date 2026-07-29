@@ -25,7 +25,6 @@ PIPELINE_FLOW_DIAGRAM.md
 PIPELINE_TEST_REPORT.md
 POV_ON_IDEAL.md
 PRODUCTION_READINESS_REVIEW.md
-REMAINING_WORK.md
 hello.md
 
 # Temp test scripts (root only)
@@ -46,8 +45,7 @@ server.log
 ffmpeg.exe
 
 # Design specs
-design1.md
-design2.md
+design*.md
 current basic.md
 
 # Review files
@@ -58,11 +56,6 @@ SYSTEM_DESIGN_REVIEW.md
 # Change summaries
 pipeline_improvements.md
 architecture_refactor.md
-phase1_5_phase2_implementation.md
-
-# Design specs continued
-design3.md
-design5.md
 
 # Phase / summary docs
 phase1.5-summary.md
@@ -73,11 +66,34 @@ phase1_5_phase2_implementation.md
 test_pipeline_result.md
 
 # All generated/report md files not already listed
-# (README.md is kept — it's the project readme)
 *.qa_report.md
 *QA_REPORT*.md
-design7.md
 scripts/qa_test_full_pipeline.py
 
 # Evaluation outputs
 app/evaluation/__pycache__/
+
+# Phase 3 test scripts
+/test_phase3_pipeline.py
+/FULL_PIPELINE_TEST_RESULTS.md
+
+# Latency optimization specs (moved to docs/)
+/latency*.md
+/latency_optimization_plan.md
+
+# Pipeline v2 test scripts
+/test_pipeline_v2.py
+/test_run.py
+/test_run2.py
+
+# Pipeline v2 test results
+/PIPELINE_V2_TEST_RESULTS.md
+/pipeline_test_report.md
+
+# Planning / spec docs (root level)
+/[0-9].md
+/architecture.md
+/gothrough.md
+
+# Generated architecture reviews
+docs/CLEARLENS_ARCHITECTURE_ANALYSIS.md

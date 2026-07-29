@@ -57,32 +57,26 @@ def _extract_frames_opencv(video_path: str, max_frames: int) -> list[bytes]:
     return frames
 
 
-    async def _download_video(video_id: str) -> Optional[str]:
-        try:
-            import yt_dlp
-            tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-            tmp.close()
-            out = tmp.name.replace(".mp4", "")
+async def _download_video(video_id: str) -> Optional[str]:
+    try:
+        import yt_dlp
+        tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+        tmp.close()
+        out = tmp.name.replace(".mp4", "")
 
-            ffmpeg_path = os.path.join(os.path.dirname(__file__), "..", "..", "ffmpeg.exe")
-            ffmpeg_path = os.path.abspath(ffmpeg_path)
-            if not os.path.exists(ffmpeg_path):
-                ffmpeg_path = "ffmpeg"
+        ffmpeg_path = os.path.join(os.path.dirname(__file__), "..", "..", "ffmpeg.exe")
+        ffmpeg_path = os.path.abspath(ffmpeg_path)
+        if not os.path.exists(ffmpeg_path):
+            ffmpeg_path = "ffmpeg"
 
-            ydl_opts = {
-                "format": "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst",
-                "outtmpl": out + ".%(ext)s",
-                "ffmpeg_location": ffmpeg_path,
-                "quiet": True,
-                "no_warnings": True,
-                "max_filesize": 50 * 1024 * 1024,
-            }
-        loop = None
-        try:
-            import asyncio
-            loop = asyncio.get_event_loop()
-        except Exception:
-            pass
+        ydl_opts = {
+            "format": "worstvideo[ext=mp4]+worstaudio[ext=m4a]/worst[ext=mp4]/worst",
+            "outtmpl": out + ".%(ext)s",
+            "ffmpeg_location": ffmpeg_path,
+            "quiet": True,
+            "no_warnings": True,
+            "max_filesize": 50 * 1024 * 1024,
+        }
 
         def _download():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -94,6 +88,13 @@ def _extract_frames_opencv(video_path: str, max_frames: int) -> list[bytes]:
             if os.path.exists(webm):
                 return webm
             return None
+
+        loop = None
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+        except Exception:
+            pass
 
         if loop and loop.is_running():
             return await loop.run_in_executor(None, _download)

@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from app.config import settings
 from app.llm.client import call_llm, parse_json_response
 from app.llm.prompt_loader import format_prompt
@@ -11,7 +12,7 @@ FALLBACK_FACTORS = ["Limited supporting evidence", "Automatic fallback explanati
 
 
 class ReasoningService:
-    async def analyze(self, claim: str, claim_category: str = "", transcript: str = "", ocr_text: str = "", evidence: list[str] = None) -> ReasoningResult:
+    async def analyze(self, claim: str, claim_category: str = "", transcript: str = "", ocr_text: str = "", evidence: list[str] = None, model_override: Optional[str] = None) -> ReasoningResult:
         if not settings.openrouter_api_key and not settings.openai_api_key:
             return ReasoningResult(claim=claim[:200], explanation=FALLBACK_EXPLANATION, key_factors=FALLBACK_FACTORS.copy())
 
@@ -32,7 +33,7 @@ class ReasoningService:
         prompt = format_prompt("reasoning", context="\n\n".join(ctx_parts))
 
         for attempt in range(2):
-            content = await call_llm(prompt, max_tokens=1200, temperature=0.1)
+            content = await call_llm(prompt, max_tokens=1200, temperature=0.1, model_override=model_override)
             if content:
                 parsed = parse_json_response(content)
                 if parsed:

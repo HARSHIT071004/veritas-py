@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
@@ -5,8 +6,9 @@ from fastapi import Query
 from typing import Optional
 
 from app.auth.dependencies import get_current_user_id, optional_user_id
-from app.api.deps import get_analyzer, get_cache, get_db
+from app.api.deps import get_analyzer, get_cache, get_db, get_pipeline_cache
 from app.pipeline.analyzer import Analyzer
+from app.pipeline.cache import MultiLevelCache
 from app.data.database import Database
 from app.data.cache import RedisCache
 from app.data.repositories.analysis_repository import AnalysisRepository
@@ -25,6 +27,7 @@ class AnalyzeRequest(BaseModel):
     description: str = Field(default="", max_length=2000)
     channel: str = Field(default="", max_length=200)
     hashtags: list[str] = Field(default_factory=list)
+    mode: str = Field(default="balanced", pattern=r"^(fast|balanced|accurate)$")
 
 
 class AnalyzeResponse(BaseModel):
@@ -39,6 +42,83 @@ class FeedbackRequest(BaseModel):
     rating: str = Field(..., pattern=r"^(helpful|not_helpful|incorrect)$")
 
 
+class PrefetchRequest(BaseModel):
+    video_id: str = Field(..., min_length=5, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
+    background: bool = False
+
+
+_in_flight_prefetch: set[str] = set()
+
+
+@router.post("/prefetch")
+async def prefetch_video(
+    req: PrefetchRequest,
+    pipeline_cache: MultiLevelCache = Depends(get_pipeline_cache),
+    redis_cache: Optional[RedisCache] = Depends(get_cache),
+    db: Database = Depends(get_db),
+):
+    vid = req.video_id
+
+    if vid in _in_flight_prefetch:
+        logger.info(f"Prefetch already in flight for {vid}, skipping")
+        return {"success": True, "video_id": vid, "status": "already_in_flight"}
+
+    cached = await pipeline_cache.get("transcript", vid)
+    if cached:
+        logger.info(f"Prefetch cache hit for {vid}, skipping")
+        return {"success": True, "video_id": vid, "status": "cached"}
+
+    _in_flight_prefetch.add(vid)
+    try:
+        from app.services.transcript_service import TranscriptService
+
+        ts = TranscriptService()
+
+        asyncio.ensure_future(_safe_prefetch_transcript(ts, vid, pipeline_cache))
+        asyncio.ensure_future(_safe_prefetch_metadata(ts, vid, pipeline_cache))
+
+        if req.background:
+            analyzer = get_analyzer()
+            asyncio.ensure_future(_safe_prefetch_analysis(analyzer, vid))
+
+        return {"success": True, "video_id": vid, "status": "prefetching"}
+    finally:
+        _in_flight_prefetch.discard(vid)
+
+
+async def _safe_prefetch_transcript(ts, video_id: str, cache: MultiLevelCache):
+    try:
+        result = await ts.extract(video_id)
+        if result.text:
+            await cache.set("transcript", {
+                "text": result.text,
+                "source": result.source,
+                "language": result.language,
+                "duration": result.duration,
+                "available": True,
+            }, video_id)
+            logger.info(f"Prefetched transcript for {video_id}")
+    except Exception as e:
+        logger.debug(f"Prefetch transcript failed for {video_id}: {e}")
+
+
+async def _safe_prefetch_metadata(ts, video_id: str, cache: MultiLevelCache):
+    try:
+        meta = await ts.get_metadata(video_id)
+        if meta:
+            await cache.set("metadata", meta, video_id)
+            logger.info(f"Prefetched metadata for {video_id}")
+    except Exception as e:
+        logger.debug(f"Prefetch metadata failed for {video_id}: {e}")
+
+
+async def _safe_prefetch_analysis(analyzer, video_id: str):
+    try:
+        await analyzer.analyze(video_id, {}, "background", mode="fast", prefetched=True)
+    except Exception as e:
+        logger.debug(f"Prefetch analysis failed for {video_id}: {e}")
+
+
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_video(
     req: AnalyzeRequest,
@@ -46,6 +126,7 @@ async def analyze_video(
     analyzer: Analyzer = Depends(get_analyzer),
     db: Database = Depends(get_db),
     redis_cache: Optional[RedisCache] = Depends(get_cache),
+    pipeline_cache: MultiLevelCache = Depends(get_pipeline_cache),
 ):
     users = UserRepository(db)
     quota = users.get_quota(user_id)
@@ -61,7 +142,7 @@ async def analyze_video(
 
     try:
         metadata = {"title": req.title, "description": req.description, "channel": req.channel, "hashtags": req.hashtags}
-        result = await analyzer.analyze(req.video_id, metadata, user_id)
+        result = await analyzer.analyze(req.video_id, metadata, user_id, mode=req.mode)
         if redis_cache:
             await redis_cache.set(f"analysis:{req.video_id}", result, ttl=600)
         return AnalyzeResponse(success=True, result=result)
@@ -85,7 +166,7 @@ async def analyze_video_async(
     if not redis_cache:
         return JobSubmitResponse(success=False, error="Async analysis requires Redis")
 
-    metadata = {"title": req.title, "description": req.description, "channel": req.channel, "hashtags": req.hashtags}
+    metadata = {"title": req.title, "description": req.description, "channel": req.channel, "hashtags": req.hashtags, "mode": req.mode}
     job_id = await create_job(req.video_id, user_id, redis_cache)
     return JobSubmitResponse(success=True, job_id=job_id, status="queued")
 

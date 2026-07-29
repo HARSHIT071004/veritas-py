@@ -1,52 +1,102 @@
 import os
 import re
+import json
+import time
 import tempfile
 import logging
 from typing import Optional
+import httpx
 from app.config import settings
 from app.schemas.pipeline_models import TranscriptResult
 
 logger = logging.getLogger("clearlens.services.transcript")
 
-_transcript_cache: dict[str, TranscriptResult] = {}
+_transcript_cache: dict[str, tuple[TranscriptResult, float]] = {}
+_metadata_cache: dict[str, tuple[dict, float]] = {}
+_CACHE_TTL = 86400
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=15, limits=httpx.Limits(max_keepalive_connections=10, max_connections=20))
+    return _http_client
 
 
 class TranscriptService:
     async def extract(self, video_id: str) -> TranscriptResult:
         if video_id in _transcript_cache:
-            cached = _transcript_cache[video_id]
-            logger.info(f"Transcript cache hit for {video_id}")
-            return cached
+            cached, ts = _transcript_cache[video_id]
+            if time.time() - ts < _CACHE_TTL:
+                logger.info(f"Transcript cache hit for {video_id}")
+                return cached
+            del _transcript_cache[video_id]
 
         result = await self._fetch_youtube_transcript(video_id)
         if result:
-            _transcript_cache[video_id] = result
+            _transcript_cache[video_id] = (result, time.time())
             return result
 
         result = await self._fetch_youtube_captions(video_id)
         if result:
-            _transcript_cache[video_id] = result
+            _transcript_cache[video_id] = (result, time.time())
             return result
 
         result = await self._whisper_transcribe(video_id, provider="groq")
         if result:
             r = TranscriptResult(text=result, language="unknown", duration=0, source="groq_whisper")
-            _transcript_cache[video_id] = r
+            _transcript_cache[video_id] = (r, time.time())
             return r
 
         result = await self._whisper_transcribe(video_id, provider="openai")
         if result:
             r = TranscriptResult(text=result, language="unknown", duration=0, source="openai_whisper")
-            _transcript_cache[video_id] = r
+            _transcript_cache[video_id] = (r, time.time())
             return r
 
         return TranscriptResult(source=None)
+
+    async def get_metadata(self, video_id: str) -> dict:
+        if video_id in _metadata_cache:
+            cached, ts = _metadata_cache[video_id]
+            if time.time() - ts < _CACHE_TTL:
+                return cached
+            del _metadata_cache[video_id]
+        try:
+            client = _get_client()
+            resp = await client.get(
+                f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                meta = {
+                    "title": data.get("title", ""),
+                    "channel": data.get("author_name", ""),
+                    "thumbnail": data.get("thumbnail_url", ""),
+                }
+                _metadata_cache[video_id] = (meta, time.time())
+                return meta
+        except Exception as e:
+            logger.debug(f"oEmbed metadata failed for {video_id}: {e}")
+        return {}
 
     def _clean(self, text: str) -> str:
         text = re.sub(r"&#\d+;", "", text)
         text = re.sub(r"&amp;", "&", text)
         text = re.sub(r"\s+", " ", text).strip()
         return text
+
+    def _deduplicate_lines(self, text: str) -> str:
+        seen = set()
+        lines = text.split(". ")
+        unique = []
+        for line in lines:
+            normalized = re.sub(r"\s+", "", line.lower())[:60]
+            if normalized not in seen:
+                seen.add(normalized)
+                unique.append(line)
+        return ". ".join(unique)
 
     def _get_duration(self, segments: list) -> int:
         if not segments:
@@ -57,47 +107,45 @@ class TranscriptService:
         return int((offset + dur) / 1000) if dur else int(offset / 1000)
 
     async def _fetch_youtube_transcript(self, video_id: str) -> Optional[TranscriptResult]:
-        import httpx
+        client = _get_client()
         languages = ["hi", "en", "hinglish", "aae", "en-US", "en-GB"]
         for lang in languages:
             try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.get(
-                        f"https://youtubetranscript.com/api?vid={video_id}&lang={lang}",
-                        timeout=10
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        if isinstance(data, list):
-                            text = " ".join(seg.get("text", "") for seg in data)
-                            text = self._clean(text)
-                            duration = self._get_duration(data)
-                            return TranscriptResult(text=text, language=lang, duration=duration, source="youtube_transcript")
-                        if isinstance(data, dict) and "text" in data:
-                            text = self._clean(data["text"])
-                            return TranscriptResult(text=text, language=lang, duration=0, source="youtube_transcript")
-            except Exception as e:
-                logger.debug(f"YouTube transcript API failed for lang={lang}: {e}")
-        return None
-
-    async def _fetch_youtube_captions(self, video_id: str) -> Optional[TranscriptResult]:
-        try:
-            import httpx
-            async with httpx.AsyncClient() as client:
                 resp = await client.get(
-                    f"https://youtubetranscript.com/api?vid={video_id}",
-                    timeout=10
+                    f"https://youtubetranscript.com/api?vid={video_id}&lang={lang}"
                 )
                 if resp.status_code == 200:
                     data = resp.json()
                     if isinstance(data, list):
                         text = " ".join(seg.get("text", "") for seg in data)
                         text = self._clean(text)
+                        text = self._deduplicate_lines(text)
                         duration = self._get_duration(data)
-                        return TranscriptResult(text=text, language="en", duration=duration, source="youtube_caption")
+                        return TranscriptResult(text=text, language=lang, duration=duration, source="youtube_transcript")
                     if isinstance(data, dict) and "text" in data:
                         text = self._clean(data["text"])
-                        return TranscriptResult(text=text, language="en", duration=0, source="youtube_caption")
+                        return TranscriptResult(text=text, language=lang, duration=0, source="youtube_transcript")
+            except Exception as e:
+                logger.debug(f"YouTube transcript API failed for lang={lang}: {e}")
+        return None
+
+    async def _fetch_youtube_captions(self, video_id: str) -> Optional[TranscriptResult]:
+        client = _get_client()
+        try:
+            resp = await client.get(
+                f"https://youtubetranscript.com/api?vid={video_id}"
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list):
+                    text = " ".join(seg.get("text", "") for seg in data)
+                    text = self._clean(text)
+                    text = self._deduplicate_lines(text)
+                    duration = self._get_duration(data)
+                    return TranscriptResult(text=text, language="en", duration=duration, source="youtube_caption")
+                if isinstance(data, dict) and "text" in data:
+                    text = self._clean(data["text"])
+                    return TranscriptResult(text=text, language="en", duration=0, source="youtube_caption")
         except Exception as e:
             logger.debug(f"YouTube captions failed: {e}")
         return None
@@ -143,10 +191,13 @@ class TranscriptService:
             if not os.path.exists(ffmpeg_path):
                 ffmpeg_path = "ffmpeg"
             ydl_opts = {
-                "format": "bestaudio/best", "outtmpl": output,
+                "format": "bestaudio/best",
+                "outtmpl": output,
                 "ffmpeg_location": ffmpeg_path,
                 "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "64"}],
-                "quiet": True, "no_warnings": True,
+                "quiet": True,
+                "no_warnings": True,
+                "extract_flat": False,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
@@ -161,17 +212,16 @@ class TranscriptService:
 
     async def _send_to_whisper(self, audio_path: str, api_key: str, model: str, endpoint: str) -> Optional[str]:
         try:
-            import httpx
+            client = _get_client()
             with open(audio_path, "rb") as f:
-                async with httpx.AsyncClient(timeout=60) as client:
-                    resp = await client.post(
-                        endpoint,
-                        headers={"Authorization": f"Bearer {api_key}"},
-                        files={"file": (os.path.basename(audio_path), f, "audio/mpeg")},
-                        data={"model": model, "response_format": "json"}
-                    )
-                    if resp.status_code == 200:
-                        return resp.json().get("text")
+                resp = await client.post(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    files={"file": (os.path.basename(audio_path), f, "audio/mpeg")},
+                    data={"model": model, "response_format": "json"}
+                )
+                if resp.status_code == 200:
+                    return resp.json().get("text")
         except Exception:
             pass
         return None
