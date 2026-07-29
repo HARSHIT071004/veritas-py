@@ -7,7 +7,7 @@ python-multipart==0.0.12
 pyjwt==2.9.0
 
 # RAG Engine
-sentence-transformers>=3.0.0    # pulls transformers + torch
+sentence-transformers>=3.0.0
 faiss-cpu>=1.8.0
 rank-bm25>=0.2.2
 numpy>=1.26.0
@@ -16,15 +16,14 @@ numpy>=1.26.0
 yt-dlp>=2024.0.0
 openai>=1.0.0
 
-# OCR — self-hosted engines (all optional, fallback to Gemini API)
-# Note: requires VC++ 2015-2022 Redist on Windows for torch-based OCR
+# OCR — optional
 opencv-python>=5.0.0
 easyocr>=1.7.2
 paddleocr>=3.7.0
-transformers>=4.44.0            # PaddleOCR-VL support
+transformers>=4.44.0
 Pillow>=10.0.0
 
-# Redis (optional — caching, job queue, rate limiting)
+# Redis (optional)
 redis>=5.0.0
 arq>=0.26.0
 
