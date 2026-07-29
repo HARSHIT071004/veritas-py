@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"Seeded RAG engine with {len(docs)} knowledge documents")
 
     ingestion_pipeline = IngestionPipeline(rag_engine)
-    app_state.init(db=db, cache=redis_cache)
+    app_state.init(db=db, cache=redis_cache, rag_engine=rag_engine)
 
     app.add_middleware(RateLimitMiddleware, redis_cache=redis_cache)
 

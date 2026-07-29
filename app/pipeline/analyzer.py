@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Optional
 from app.pipeline.orchestrator import PipelineOrchestrator
+from app.pipeline.cache import MultiLevelCache
 from app.data.database import Database
 from app.data.models import AnalysisResult
 from app.data.repositories.analysis_repository import AnalysisRepository
@@ -12,11 +13,11 @@ _in_flight: dict[str, asyncio.Future] = {}
 
 
 class Analyzer:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, cache: MultiLevelCache = None, rag_engine=None):
         self._repo = AnalysisRepository(db)
-        self._orchestrator = PipelineOrchestrator()
+        self._orchestrator = PipelineOrchestrator(cache=cache, rag_engine=rag_engine, db=db)
 
-    async def analyze(self, video_id: str, metadata: dict, user_id: str, mode: str = "balanced") -> dict:
+    async def analyze(self, video_id: str, metadata: dict, user_id: str, mode: str = "balanced", prefetched: bool = False) -> dict:
         cached = self._repo.get_cached(video_id)
         if cached:
             return cached
@@ -29,7 +30,7 @@ class Analyzer:
         future = loop.create_future()
         _in_flight[video_id] = future
         try:
-            result_dict = await self._run_pipeline(video_id, metadata, user_id, mode)
+            result_dict = await self._run_pipeline(video_id, metadata, user_id, mode, prefetched)
             future.set_result(result_dict)
             return result_dict
         except Exception as e:
@@ -39,8 +40,8 @@ class Analyzer:
         finally:
             _in_flight.pop(video_id, None)
 
-    async def _run_pipeline(self, video_id: str, metadata: dict, user_id: str, mode: str) -> dict:
-        pipeline_res = await self._orchestrator.run(video_id, metadata, mode=mode)
+    async def _run_pipeline(self, video_id: str, metadata: dict, user_id: str, mode: str, prefetched: bool) -> dict:
+        pipeline_res = await self._orchestrator.run(video_id, metadata, mode=mode, user_id=user_id, prefetched=prefetched)
         result_dict = pipeline_res.result
 
         if not result_dict or pipeline_res.status == "failed":

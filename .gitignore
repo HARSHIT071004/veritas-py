@@ -80,3 +80,20 @@ app/evaluation/__pycache__/
 # Latency optimization specs (moved to docs/)
 /latency*.md
 /latency_optimization_plan.md
+
+# Pipeline v2 test scripts
+/test_pipeline_v2.py
+/test_run.py
+/test_run2.py
+
+# Pipeline v2 test results
+/PIPELINE_V2_TEST_RESULTS.md
+/pipeline_test_report.md
+
+# Planning / spec docs (root level)
+/[0-9].md
+/architecture.md
+/gothrough.md
+
+# Generated architecture reviews
+docs/CLEARLENS_ARCHITECTURE_ANALYSIS.md
