@@ -42,6 +42,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   switch (msg.type) {
+    case "PREFETCH":
+      prefetchVideo(msg.videoId, msg.background).then(sendResponse);
+      return true;
     case "ANALYZE":
       analyzeVideo(msg.videoId, msg.metadata, sender.tab?.id).then(sendResponse);
       return true;
@@ -79,6 +82,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
   }
 });
+
+async function prefetchVideo(videoId, background) {
+  try {
+    const base = await getApiBase();
+    await fetch(`${base}/api/v1/prefetch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ video_id: videoId, background: !!background }),
+    });
+  } catch (err) {
+  }
+  return { prefetched: true };
+}
 
 async function analyzeVideo(videoId, metadata, tabId) {
   try {

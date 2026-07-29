@@ -1,0 +1,35 @@
+Analyze the video transcript. Extract factual claims, classify each, and evaluate truthfulness.
+
+TRANSCRIPT:
+{transcript}
+
+TITLE: {title}
+CHANNEL: {channel}
+
+Return JSON only:
+{{
+  "video_summary": "one-line summary",
+  "claims": [
+    {{
+      "claim": "exact factual claim",
+      "category": "health|political|scientific|financial|conspiracy|opinion|satire|general",
+      "risk_level": "low|medium|high",
+      "verdict": "true|false|misleading|unverifiable",
+      "confidence": 0.0-1.0,
+      "explanation": "why this verdict",
+      "key_factors": ["factor1", "factor2"],
+      "sources": []
+    }}
+  ]
+}}
+
+Rules:
+- Extract ONLY verifiable factual claims
+- Category: health(medical), political(elections), scientific(research), financial(money), conspiracy(theories), opinion(subjective), satire(humor), general(other)
+- risk_level: high=health/safety, medium=political/scientific, low=general
+- verdict: true(supported), false(contradicted), misleading(missing context), unverifiable(insufficient evidence)
+- confidence: how strongly evidence supports verdict
+- explanation: min 30 chars, be specific
+- key_factors: 2-3 concise reasons
+- Never guess. Lack of evidence is NOT proof of falsehood.
+- If no factual claims exist, return empty claims array
