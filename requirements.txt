@@ -7,7 +7,7 @@ python-multipart==0.0.12
 pyjwt==2.9.0
 
 # RAG Engine
-sentence-transformers>=3.0.0
+sentence-transformers>=3.0.0    # pulls transformers + torch
 faiss-cpu>=1.8.0
 rank-bm25>=0.2.2
 numpy>=1.26.0
@@ -21,9 +21,15 @@ openai>=1.0.0
 opencv-python>=5.0.0
 easyocr>=1.7.2
 paddleocr>=3.7.0
+transformers>=4.44.0            # PaddleOCR-VL support
+Pillow>=10.0.0
 
-# Redis (optional)
+# Redis (optional — caching, job queue, rate limiting)
 redis>=5.0.0
+arq>=0.26.0
+
+# Auth
+bcrypt>=4.0.0
 
 # Testing
 pytest>=8.3.0

@@ -28,13 +28,13 @@ PRODUCTION_READINESS_REVIEW.md
 REMAINING_WORK.md
 hello.md
 
-# Temp test scripts
-check_status.py
-test_full_pipeline.py
-test_groq.py
-test_openrouter.py
-test_pipeline.py
-get_yt_meta.py
+# Temp test scripts (root only)
+/check_status.py
+/test_full_pipeline.py
+/test_groq.py
+/test_openrouter.py
+/test_pipeline.py
+/get_yt_meta.py
 
 # Generated outputs
 test_pipeline_result.json
@@ -44,3 +44,40 @@ server.log
 
 # Downloaded binaries
 ffmpeg.exe
+
+# Design specs
+design1.md
+design2.md
+current basic.md
+
+# Review files
+CODE_REVIEW.md
+CURRENT_STATUS.md
+SYSTEM_DESIGN_REVIEW.md
+
+# Change summaries
+pipeline_improvements.md
+architecture_refactor.md
+phase1_5_phase2_implementation.md
+
+# Design specs continued
+design3.md
+design5.md
+
+# Phase / summary docs
+phase1.5-summary.md
+FINAL_SUMMARY.md
+phase1_5_phase2_implementation.md
+
+# Eval outputs
+test_pipeline_result.md
+
+# All generated/report md files not already listed
+# (README.md is kept — it's the project readme)
+*.qa_report.md
+*QA_REPORT*.md
+design7.md
+scripts/qa_test_full_pipeline.py
+
+# Evaluation outputs
+app/evaluation/__pycache__/

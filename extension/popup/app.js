@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
       document.getElementById(tab.dataset.tab).classList.add("active");
       if (tab.dataset.tab === "history") loadHistory();
       if (tab.dataset.tab === "account") checkAuth();
+      if (tab.dataset.tab === "settings") loadSettings();
     });
   });
 
@@ -17,8 +18,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   document.getElementById("show-register").addEventListener("click", (e) => {
     e.preventDefault();
-    document.getElementById("login-form").style.display = "none";
-    document.getElementById("register-form").style.display = "block";
+    document.getElementById("login-form").style.display = "block";
+    document.getElementById("register-form").style.display = "none";
   });
 
   document.getElementById("show-login").addEventListener("click", (e) => {
@@ -55,6 +56,17 @@ document.addEventListener("DOMContentLoaded", () => {
       loadStats();
     });
   });
+
+  document.getElementById("save-settings").addEventListener("click", () => {
+    const url = document.getElementById("api-url").value.trim();
+    if (!url) return;
+    chrome.runtime.sendMessage({ type: "SET_API_URL", url }, (res) => {
+      const msg = document.getElementById("settings-msg");
+      msg.textContent = "Saved";
+      msg.style.display = "block";
+      setTimeout(() => msg.style.display = "none", 2000);
+    });
+  });
 });
 
 function showError(msg) {
@@ -84,10 +96,16 @@ function checkAuth() {
       document.getElementById("register-form").style.display = "none";
       document.getElementById("profile").style.display = "block";
       document.getElementById("profile-email").textContent = "Logged in: " + (data.userEmail || data.userId);
-      document.getElementById("auth-status").textContent = "✓ Signed in";
+      document.getElementById("auth-status").textContent = "Signed in";
     } else {
       showLoginForm();
     }
+  });
+}
+
+function loadSettings() {
+  chrome.runtime.sendMessage({ type: "GET_API_URL" }, (res) => {
+    document.getElementById("api-url").value = res?.url || "http://localhost:8000";
   });
 }
 

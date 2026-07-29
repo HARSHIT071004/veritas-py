@@ -1,0 +1,27 @@
+Classify each claim into exactly one category.
+
+Categories:
+- health: medical claims, treatments, cures, vaccines, nutrition, fitness
+- political: elections, policies, government actions, legislation
+- scientific: research findings, studies, data claims, technology
+- financial: money, investments, economic claims, prices
+- conspiracy: conspiracy theories, hidden agendas, cover-ups
+- opinion: personal beliefs, subjective views, value judgments
+- satire: exaggerated humor, parody, obviously false for comedic effect
+- general: other factual claims not covered above
+
+Claims to classify:
+{items}
+
+Return ONLY valid JSON:
+{{
+  "classifications": [
+    {{
+      "claim_index": 0,
+      "category": "health|political|scientific|financial|conspiracy|opinion|satire|general",
+      "confidence": 0.0-1.0
+    }}
+  ]
+}}
+
+Match the claim_index to the order above (0-based).

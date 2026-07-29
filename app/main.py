@@ -15,26 +15,26 @@ from app.mcp.tools.vision import VisionTool
 from app.mcp.tools.retrieval import RetrievalTool
 from app.mcp.tools.reason import ReasonTool
 from app.mcp.tools.claim_extractor import ClaimExtractorTool
+from app.mcp.tools.classifier import ClassifierTool
 from app.mcp.resources.knowledge import KnowledgeResource
 from app.mcp.resources.cache import CacheResource
 from app.api.routes import router as api_router
-from app.api.routes import init_routes as init_api_routes
 from app.auth.routes import router as auth_router
-from app.auth.routes import init_routes as init_auth_routes
+
+from app.api.deps import app_state
 from app.pipeline.analyzer import Analyzer
 from app.middleware.logging import setup_logging
 from app.middleware.error_handler import ErrorHandlerMiddleware, RequestValidationMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
 from seed.knowledge import seed_knowledge_base
 
-db: Database = None
 mcp: MCPServer = None
 rag_engine: RAGEngine = None
-redis_cache: RedisCache = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global db, mcp, rag_engine, redis_cache
+    global mcp, rag_engine
 
     logger = setup_logging(settings.log_level, settings.log_file)
     Path("data").mkdir(exist_ok=True)
@@ -42,8 +42,11 @@ async def lifespan(app: FastAPI):
     logger.info("Starting ClearLens server", extra={"port": settings.port, "debug": settings.debug})
 
     db = Database(settings.database_path)
-
     redis_cache = RedisCache()
+    if redis_cache._enabled:
+        logger.info("Redis is enabled and configured")
+    else:
+        logger.warning("Redis is not available — caching, job queue, and rate limiting will be disabled")
 
     rag_engine = RAGEngine(persist_dir=settings.rag_persist_dir)
     loaded = rag_engine.load()
@@ -59,6 +62,7 @@ async def lifespan(app: FastAPI):
     mcp.register_tool(RetrievalTool(engine=rag_engine))
     mcp.register_tool(ReasonTool())
     mcp.register_tool(ClaimExtractorTool())
+    mcp.register_tool(ClassifierTool())
 
     knowledge = KnowledgeResource()
     cache_res = CacheResource(db)
@@ -76,13 +80,9 @@ async def lifespan(app: FastAPI):
             logger.info(f"Seeded RAG engine with {len(docs)} knowledge documents")
 
     ingestion_pipeline = IngestionPipeline(rag_engine)
-    analyzer = Analyzer(mcp, db)
+    app_state.init(db=db, cache=redis_cache)
 
-    init_api_routes(analyzer, db, redis_cache)
-    init_auth_routes(db)
-
-    app.include_router(auth_router)
-    app.include_router(api_router, prefix="/api/v1")
+    app.add_middleware(RateLimitMiddleware, redis_cache=redis_cache)
 
     logger.info("Server startup complete", extra={"tools": len(mcp.list_tools()), "resources": len(mcp.list_resources())})
 
@@ -108,6 +108,9 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+app.include_router(auth_router)
+app.include_router(api_router, prefix="/api/v1")
 
 ext_path = Path(__file__).parent.parent / "extension"
 if ext_path.exists():
