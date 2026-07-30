@@ -1,28 +1,24 @@
-from fastapi import Header, HTTPException, Request
+from fastapi import Header, HTTPException, Request, status
 from typing import Optional
-from app.auth.jwt import decode_token
+from app.config import settings
 
 
 async def get_current_user_id(
-    authorization: Optional[str] = Header(None),
-    x_user_id: Optional[str] = Header(None)
+    x_internal_key: str = Header(None, alias="X-Internal-Key"),
+    x_user_id: str = Header(None, alias="X-User-Id"),
 ) -> str:
-    if authorization and authorization.startswith("Bearer "):
-        token = authorization[7:]
-        payload = decode_token(token)
-        if payload and "sub" in payload:
-            return payload["sub"]
-    if x_user_id:
-        return x_user_id
-    raise HTTPException(status_code=401, detail="Authentication required")
+    if x_internal_key != settings.internal_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal API key",
+        )
+    return x_user_id or "anonymous"
 
 
 async def optional_user_id(
-    authorization: Optional[str] = Header(None),
-    x_user_id: Optional[str] = Header(None)
+    x_internal_key: str = Header(None, alias="X-Internal-Key"),
+    x_user_id: str = Header(None, alias="X-User-Id"),
 ) -> str:
-    if authorization and authorization.startswith("Bearer "):
-        payload = decode_token(authorization[7:])
-        if payload and "sub" in payload:
-            return payload["sub"]
-    return x_user_id or "anonymous"
+    if x_internal_key == settings.internal_api_key:
+        return x_user_id or "anonymous"
+    return "anonymous"

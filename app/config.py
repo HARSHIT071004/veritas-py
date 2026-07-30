@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     jwt_secret: str = "clearlens-dev-secret-change-in-production"
     jwt_expiry_seconds: int = 86400
 
+    internal_api_key: str = ""
+
     redis_url: Optional[str] = None
     redis_enabled: bool = False
 

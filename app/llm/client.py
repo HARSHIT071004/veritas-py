@@ -15,6 +15,53 @@ _http_client: Optional[httpx.AsyncClient] = None
 _MAX_CACHE_SIZE = 256
 _CACHE_TTL = 3600
 
+_circuit_breakers: dict[str, dict] = {}
+
+
+def _get_circuit_state(provider: str) -> dict:
+    if provider not in _circuit_breakers:
+        _circuit_breakers[provider] = {
+            "state": "closed",
+            "failures": 0,
+            "failure_threshold": 5,
+            "cooldown_ms": 30000,
+            "last_failure_time": 0,
+        }
+    return _circuit_breakers[provider]
+
+
+def _is_circuit_open(provider: str) -> bool:
+    state = _get_circuit_state(provider)
+    if state["state"] == "closed":
+        return False
+    if state["state"] == "open":
+        elapsed = time.time() - state["last_failure_time"]
+        if elapsed * 1000 >= state["cooldown_ms"]:
+            state["state"] = "half-open"
+            logger.info(f"Circuit breaker for {provider} transitioning to half-open")
+            return False
+        return True
+    if state["state"] == "half-open":
+        return False
+    return False
+
+
+def _record_success(provider: str):
+    state = _get_circuit_state(provider)
+    if state["state"] == "half-open":
+        logger.info(f"Circuit breaker for {provider} recovered, closing")
+    state["state"] = "closed"
+    state["failures"] = 0
+
+
+def _record_failure(provider: str):
+    state = _get_circuit_state(provider)
+    state["failures"] += 1
+    state["last_failure_time"] = time.time()
+    if state["failures"] >= state["failure_threshold"]:
+        state["state"] = "open"
+        logger.warning(f"Circuit breaker for {provider} opened after {state['failures']} failures")
+
 
 def _get_client() -> httpx.AsyncClient:
     global _http_client
@@ -70,16 +117,22 @@ async def call_llm(prompt: str, max_tokens: int = 1000, temperature: float = 0.1
         return cached
 
     for name, func in providers:
+        if _is_circuit_open(name):
+            logger.warning(f"Circuit breaker open for {name}, skipping")
+            continue
         for attempt in range(3):
             try:
                 timeout = min(30 + attempt * 30, 120)
                 content = await func(prompt, max_tokens, temperature, timeout)
                 if content:
+                    _record_success(name)
                     _set_cache(cache_key, content)
                     return content
                 logger.warning(f"{name} returned empty on attempt {attempt+1}")
             except Exception as e:
                 logger.warning(f"{name} failed on attempt {attempt+1}: {e}")
+                if attempt == 2:
+                    _record_failure(name)
             if attempt < 2:
                 await asyncio.sleep(1 + attempt * 3)
     return None

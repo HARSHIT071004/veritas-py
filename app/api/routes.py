@@ -213,10 +213,40 @@ async def submit_feedback(
 async def health(db: Database = Depends(get_db)):
     users = UserRepository(db)
     return {
-        "status": "ok",
-        "app": settings.app_name,
-        "openai_configured": bool(settings.openai_api_key),
-        "gemini_configured": bool(settings.gemini_api_key),
-        "redis_enabled": settings.redis_enabled,
-        "users_registered": users.get_count(),
+        "success": True,
+        "data": {
+            "status": "healthy",
+            "version": "1.0.0",
+            "uptime_seconds": 0,
+            "dependencies": {
+                "sqlite": "connected" if db else "disconnected",
+            },
+        },
+    }
+
+
+@router.get("/ready")
+async def ready(db: Database = Depends(get_db)):
+    deps = {
+        "sqlite": {"status": "connected" if db else "disconnected", "latency_ms": 1},
+    }
+    all_ready = all(d["status"] == "connected" for d in deps.values())
+    if all_ready:
+        return {"success": True, "data": {"status": "ready", "dependencies": deps}}
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=503,
+        content={"success": False, "data": {"status": "not_ready", "dependencies": deps}},
+    )
+
+
+@router.get("/live")
+async def live():
+    from datetime import datetime, timezone
+    return {
+        "success": True,
+        "data": {
+            "status": "alive",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
     }

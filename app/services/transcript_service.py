@@ -184,27 +184,49 @@ class TranscriptService:
     async def _download_audio(self, video_id: str) -> Optional[str]:
         try:
             import yt_dlp
-            tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
-            tmp.close()
-            output = tmp.name.replace(".mp3", "")
             ffmpeg_path = os.path.join(os.path.dirname(__file__), "..", "..", "ffmpeg.exe")
             if not os.path.exists(ffmpeg_path):
                 ffmpeg_path = "ffmpeg"
+            has_ffmpeg = False
+            try:
+                import subprocess
+                subprocess.run([ffmpeg_path, "-version"], capture_output=True, timeout=5)
+                has_ffmpeg = True
+            except Exception:
+                pass
+            suffix = ".mp3" if has_ffmpeg else ".webm"
+            tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+            tmp.close()
+            output = tmp.name.replace(suffix, "")
             ydl_opts = {
-                "format": "bestaudio/best",
-                "outtmpl": output,
-                "ffmpeg_location": ffmpeg_path,
-                "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "64"}],
+                "outtmpl": output + ".%(ext)s",
                 "quiet": True,
                 "no_warnings": True,
                 "extract_flat": False,
+                "http_headers": {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.5",
+                },
             }
+            if has_ffmpeg:
+                ydl_opts["format"] = "bestaudio/best"
+                ydl_opts["ffmpeg_location"] = ffmpeg_path
+                ydl_opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "64"}]
+            else:
+                ydl_opts["format"] = "bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best"
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
-            mp3_path = output + ".mp3"
-            if os.path.exists(mp3_path):
-                return mp3_path
-            if os.path.exists(tmp.name):
+            if has_ffmpeg:
+                mp3_path = output + ".mp3"
+                if os.path.exists(mp3_path):
+                    return mp3_path
+            else:
+                for ext in (".m4a", ".webm", ".mp3", ".opus"):
+                    path = output + ext
+                    if os.path.exists(path) and os.path.getsize(path) > 0:
+                        return path
+            if os.path.exists(tmp.name) and os.path.getsize(tmp.name) > 0:
                 return tmp.name
             return None
         except Exception:

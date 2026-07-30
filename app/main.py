@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 
 from app.config import settings
@@ -26,6 +25,7 @@ from app.pipeline.analyzer import Analyzer
 from app.middleware.logging import setup_logging
 from app.middleware.error_handler import ErrorHandlerMiddleware, RequestValidationMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.correlation_id import CorrelationIdMiddleware
 from seed.knowledge import seed_knowledge_base
 
 mcp: MCPServer = None
@@ -82,7 +82,8 @@ async def lifespan(app: FastAPI):
     ingestion_pipeline = IngestionPipeline(rag_engine)
     app_state.init(db=db, cache=redis_cache, rag_engine=rag_engine)
 
-    app.add_middleware(RateLimitMiddleware, redis_cache=redis_cache)
+    if redis_cache._enabled:
+        app.state.redis_cache = redis_cache
 
     logger.info("Server startup complete", extra={"tools": len(mcp.list_tools()), "resources": len(mcp.list_resources())})
 
@@ -99,11 +100,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(RequestValidationMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["chrome-extension://*", "https://*.youtube.com", "http://localhost:*"],
+    allow_origins=["http://localhost:*"],
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True,
@@ -112,17 +115,9 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(api_router, prefix="/api/v1")
 
-ext_path = Path(__file__).parent.parent / "extension"
-if ext_path.exists():
-    app.mount("/extension", StaticFiles(directory=str(ext_path)), name="extension")
-
 
 @app.get("/")
 async def root():
-    landing = Path(__file__).parent.parent / "extension" / "landing" / "index.html"
-    if landing.exists():
-        from fastapi.responses import HTMLResponse
-        return HTMLResponse(content=landing.read_text(encoding="utf-8"), status_code=200)
     return {"app": settings.app_name, "status": "running"}
 
 

@@ -28,7 +28,7 @@ class MultiLevelCache:
     async def get(self, stage: str, *args, **kwargs) -> Optional[Any]:
         key = self._key(stage, *args, **kwargs)
 
-        val = await self._l1_get(key)
+        val = self._l1_get(key)
         if val is not None:
             return val
 
