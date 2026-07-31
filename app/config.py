@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pathlib import Path
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseSettings):
@@ -22,6 +25,10 @@ class Settings(BaseSettings):
     opencv_frames_enabled: bool = True
     opencv_frame_interval: int = 30
 
+    web_evidence_enabled: bool = True
+    web_search_max_results: int = 8
+    web_evidence_max_claims: int = 3
+
     database_path: str = "data/clearlens.db"
     cache_ttl_seconds: int = 86400
     rag_persist_dir: str = "data/rag"
@@ -41,7 +48,7 @@ class Settings(BaseSettings):
     log_file: Optional[str] = None
 
     class Config:
-        env_file = ".env"
+        env_file = str(_PROJECT_ROOT / ".env")
         env_file_encoding = "utf-8"
 
 

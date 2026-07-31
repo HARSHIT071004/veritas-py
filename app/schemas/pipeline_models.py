@@ -42,7 +42,7 @@ class ReasoningResult(BaseModel):
     risk_level: str = "medium"
     explanation: str = ""
     key_factors: list[str] = []
-    sources: list[str] = []
+    sources: list[dict] = []
 
 
 class TrustScore(BaseModel):

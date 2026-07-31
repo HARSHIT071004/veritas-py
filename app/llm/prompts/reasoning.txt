@@ -10,7 +10,10 @@ Respond with JSON only:
   "risk_level": "low | medium | high",
   "explanation": "brief explanation of reasoning",
   "key_factors": ["factor1", "factor2"],
-  "sources": ["source1", "source2"]
+  "sources": [
+    {{"title": "article or report title", "url": "https://..."}},
+    {{"title": "article or report title", "url": "https://..."}}
+  ]
 }}
 
 Rules:
@@ -28,4 +31,7 @@ MANDATORY RULES — FOLLOW STRICTLY:
 - explanation is MANDATORY and must be at least 30 characters long.
 - key_factors MUST contain at least 2 concise reasons. Never return an empty array.
 - Even for "unverifiable", explain WHY it cannot be verified (e.g., subjective statement, no evidence, lack of trusted sources).
+- The "sources" array MUST list the real URLs of the evidence provided above. NEVER invent or guess URLs.
+- If no evidence with real URLs was provided, return "sources": [] and say in the explanation that no external evidence was available.
+- "sources" items must be objects with "title" and "url". The "url" must exactly match a URL from the evidence above.
 - Always produce valid JSON. No markdown, no code fences, no extra text outside the JSON object.

@@ -212,8 +212,19 @@ async def _call_openai(prompt: str, max_tokens: int, temperature: float, timeout
 def parse_json_response(content: str) -> Optional[dict]:
     if not content:
         return None
+    cleaned = content.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[a-zA-Z]*\s*", "", cleaned)
+        cleaned = cleaned.rstrip().removesuffix("```").strip()
     try:
-        cleaned = content.strip().removeprefix("```json").removesuffix("```").strip()
         return json.loads(cleaned)
     except Exception:
-        return None
+        pass
+    try:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start != -1 and end > start:
+            return json.loads(cleaned[start:end + 1])
+    except Exception:
+        pass
+    return None

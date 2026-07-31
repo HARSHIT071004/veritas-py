@@ -16,6 +16,9 @@ numpy>=1.26.0
 yt-dlp>=2024.0.0
 openai>=1.0.0
 
+# Web evidence retrieval
+ddgs>=8.0.0
+
 # OCR — optional
 opencv-python>=5.0.0
 easyocr>=1.7.2
