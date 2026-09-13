@@ -6,6 +6,8 @@ data/
 dist/
 *.log
 .DS_Store
+pipeline_result.json
+test_pipeline.py
 
 # Planning docs (not code)
 BUILD_SUMMARY.md
