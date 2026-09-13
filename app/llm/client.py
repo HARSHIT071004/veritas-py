@@ -104,7 +104,11 @@ async def call_llm(prompt: str, max_tokens: int = 1000, temperature: float = 0.1
     if settings.openrouter_api_key:
         providers.append(("openrouter", lambda p, mt, t, to: _call_openrouter(p, mt, t, to, model_override)))
     if settings.openai_api_key:
-        providers.append(("openai", lambda p, mt, t, to: _call_openai(p, mt, t, to, model_override)))
+        key = settings.openai_api_key
+        if key.startswith("sk-or-"):
+            pass
+        else:
+            providers.append(("openai", lambda p, mt, t, to: _call_openai(p, mt, t, to, model_override)))
 
     if not providers:
         return None
@@ -140,7 +144,7 @@ async def call_llm(prompt: str, max_tokens: int = 1000, temperature: float = 0.1
 
 async def _call_groq(prompt: str, max_tokens: int, temperature: float, timeout: int, model_override: Optional[str] = None) -> Optional[str]:
     client = _get_client()
-    model = model_override or "llama-3.3-70b-versatile"
+    model = model_override or "qwen/qwen3.8-27b"
     try:
         resp = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",

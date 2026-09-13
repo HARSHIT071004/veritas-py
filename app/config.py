@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     groq_stt_model: str = "whisper-large-v3-turbo"
 
     openrouter_api_key: Optional[str] = None
-    openrouter_model: str = "google/gemma-4-26b-a4b-it:free"
+    openrouter_model: str = "google/gemma-4-31b-it:free"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
 
     paddle_ocr_enabled: bool = True

@@ -1,0 +1,62 @@
+{
+  "video_id": "LismoOaNNHg",
+  "claim": "The Aam Aadmi Party (AAP) posted a specific photo on their official Twitter handle approximately 8 hours prior to the video.",
+  "verdict": "true",
+  "confidence": 0.41,
+  "trust_label": "medium",
+  "explanation": "The provided evidence from trusted news sources confirms that the Aam Aadmi Party (AAP) did post AI-generated photos and videos on their official X (Twitter) handle. While the specific '8 hours' timing is a detail from the video transcript, the core assertion that AAP posted such content on their official handle is directly supported by the FIRs filed against them for this action.",
+  "risk_level": "medium",
+  "key_factors": [
+    "Delhi Police filed an FIR against AAP for posting AI-generated content on their official X handle.",
+    "Multiple trusted news sources confirm the existence of these posts by AAP."
+  ],
+  "sources": [
+    {
+      "title": "FIR against AAP for posting AI-generated videos of Modi, Shah on X",
+      "url": "https://economictimes.indiatimes.com/news/elections/assembly-elections/delhi/fir-against-aap-for-posting-ai-generated-videos-of-modi-shah-on-x/articleshow/117245976.cms"
+    },
+    {
+      "title": "FIR filed against AAP for AI-generated videos on PM Modi, Amit Shah",
+      "url": "https://timesofindia.indiatimes.com/india/fir-filed-against-aap-for-ai-generated-videos-on-pm-modi-amit-shah/articleshow/117250726.cms"
+    }
+  ],
+  "transcript_source": "groq_whisper",
+  "transcript_used": true,
+  "ocr_used": false,
+  "claims_list": [
+    {
+      "claim": "The Aam Aadmi Party (AAP) posted a specific photo on their official Twitter handle approximately 8 hours prior to the video.",
+      "risk_level": "medium",
+      "requires_verification": true,
+      "context": "",
+      "category": "political",
+      "classifier_confidence": 0.2
+    },
+    {
+      "claim": "The photo posted by AAP is fake and synthetic.",
+      "risk_level": "medium",
+      "requires_verification": true,
+      "context": "",
+      "category": "political",
+      "classifier_confidence": 0.2
+    },
+    {
+      "claim": "The AAP's IT cell and members have not debunked the photo as fake.",
+      "risk_level": "medium",
+      "requires_verification": true,
+      "context": "",
+      "category": "political",
+      "classifier_confidence": 0.3
+    },
+    {
+      "claim": "The speaker possesses a 'blood-stained' photo in their hand that is real evidence of injustice.",
+      "risk_level": "medium",
+      "requires_verification": true,
+      "context": "",
+      "category": "political",
+      "classifier_confidence": 0.1
+    }
+  ],
+  "video_summary": "A political commentator alleges that the Aam Aadmi Party (AAP) posted a fake, synthetic photo on Twitter and criticizes their IT cell and members for failing to debunk it, while asserting the photo is real evidence of injustice.",
+  "processing_time_ms": 80486
+}
